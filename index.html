@@ -33,6 +33,8 @@ th:hover{background:#2d6a4f}
 td{padding:8px;border-bottom:1px solid #e8e8e8}
 tr:hover td{background:#f5f9fc}
 tr.late td{background:#fff3f3}
+tr.late{border-left:4px solid #c0392b}
+tr.late td:nth-child(7){color:#c0392b;font-weight:700}
 tr.delivered td:nth-child(2){color:#2d6a4f;font-weight:600}
 tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 .table-wrap{max-height:500px;overflow-y:auto;border-radius:8px}
@@ -68,12 +70,18 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 .err-table{font-size:11px}
 .err-table td,.err-table th{padding:6px 8px}
 
+/* Change 6: RCA/CAPA cross-reference styles */
+.highlight-row td{background:#e8f4fd !important;transition:background 0.3s}
+.dim-row{opacity:0.3;transition:opacity 0.3s}
+tr.clickable-row{cursor:pointer}
+tr.clickable-row:hover td{background:#f0f7ff}
+
 @media print{.header{break-after:avoid}.no-print{display:none}.chart-card{break-inside:avoid}.tab-nav{display:none}}
 @media(max-width:768px){.charts-row{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#e8f5e9;color:#2d6a4f;font-size:12px;border-bottom:1px solid #c8e6c9">Dashboard last rebuilt: March 13, 2026 at 05:00 PM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#e8f5e9;color:#2d6a4f;font-size:12px;border-bottom:1px solid #c8e6c9">Dashboard last rebuilt: March 13, 2026 at 05:14 PM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -96,7 +104,7 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 <div class="chart-card"><h3>Weekly Shipping Volume &amp; Cost</h3><canvas id="weeklyChart"></canvas></div>
 <div class="chart-card"><h3>Cost Breakdown</h3><canvas id="costChart"></canvas></div>
 <div class="chart-card"><h3>Transit Time Distribution (Delivered)</h3><canvas id="transitChart"></canvas></div>
-<div class="chart-card"><h3>Shipments by State</h3><canvas id="stateChart"></canvas></div>
+<div class="chart-card"><h3>Shipments by State</h3><div id="stateMapContainer" style="position:relative;width:100%;max-width:600px;margin:0 auto"></div></div>
 <div class="chart-card"><h3>Cost per Shipment Over Time</h3><canvas id="costTimeChart"></canvas></div>
 </div>
 <div class="section-title">Shipment Detail Table</div>
@@ -130,7 +138,7 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 <div class="section-title">Root Cause Analysis (RCA)</div>
 <div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
 <table class="capa-table" id="rcaTable"><thead><tr>
-<th>Pattern ID</th><th>Pattern</th><th>Type</th><th>Products Affected</th><th>Count</th><th>Risk Level</th><th>Notes</th>
+<th onclick="sortRCATable(0)">Pattern ID</th><th onclick="sortRCATable(1)">Pattern</th><th onclick="sortRCATable(2)">Type</th><th onclick="sortRCATable(3)">Products Affected</th><th onclick="sortRCATable(4)">Count</th><th onclick="sortRCATable(5)">Risk Level</th><th onclick="sortRCATable(6)">Notes</th>
 </tr></thead><tbody id="rcaBody"></tbody></table>
 </div></div>
 
@@ -138,7 +146,7 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 <div class="section-title">Corrective Actions (CAPA)</div>
 <div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
 <table class="capa-table" id="capaTable"><thead><tr>
-<th>CAPA ID</th><th>Pattern Ref</th><th>Action</th><th>Owner</th><th>Target Date</th><th>Status</th><th>Priority</th>
+<th onclick="sortCAPATable(0)">CAPA ID</th><th onclick="sortCAPATable(1)">Pattern Ref</th><th onclick="sortCAPATable(2)">Action</th><th onclick="sortCAPATable(3)">Owner</th><th onclick="sortCAPATable(4)">Target Date</th><th onclick="sortCAPATable(5)">Status</th><th onclick="sortCAPATable(6)">Priority</th>
 </tr></thead><tbody id="capaBody"></tbody></table>
 </div></div>
 
@@ -146,7 +154,7 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 <div class="section-title">Product Watch List</div>
 <div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
 <table class="capa-table" id="watchTable"><thead><tr>
-<th>Product</th><th>Reason Code</th><th>Current Count</th><th>Historical Count</th><th>Trend</th><th>Alert Level</th>
+<th onclick="sortWatchTable(0)">Product</th><th onclick="sortWatchTable(1)">Reason Code</th><th onclick="sortWatchTable(2)">Current Count</th><th onclick="sortWatchTable(3)">Historical Count</th><th onclick="sortWatchTable(4)">Trend</th><th onclick="sortWatchTable(5)">Alert Level</th>
 </tr></thead><tbody id="watchBody"></tbody></table>
 </div></div>
 
@@ -159,7 +167,7 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 </div>
 <div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
 <table class="err-table" id="errTable"><thead><tr>
-<th onclick="sortErrTable(0)">Sales Order</th><th onclick="sortErrTable(1)">Status</th><th onclick="sortErrTable(2)">Product</th><th onclick="sortErrTable(3)">Ship From</th><th onclick="sortErrTable(4)">Cost</th><th onclick="sortErrTable(5)">CSR</th><th onclick="sortErrTable(6)">Reason Code</th><th onclick="sortErrTable(7)">Date</th><th onclick="sortErrTable(8)">Pattern</th>
+<th onclick="sortErrTable(0)">Sales Order</th><th onclick="sortErrTable(1)">Status</th><th onclick="sortErrTable(2)">Product</th><th onclick="sortErrTable(3)">Ship From</th><th onclick="sortErrTable(4)">Cost</th><th onclick="sortErrTable(5)">CSR</th><th onclick="sortErrTable(6)">Reason Code</th><th onclick="sortErrTable(7)">Date</th><th onclick="sortErrTable(8)">Pattern</th><th onclick="sortErrTable(9)">Notes</th>
 </tr></thead><tbody id="errTableBody"></tbody></table>
 </div></div>
 
@@ -176,6 +184,17 @@ function switchTab(tabId) {
   var btns = document.querySelectorAll(".tab-btn");
   if (tabId === "ltl") btns[0].classList.add("active");
   else btns[1].classList.add("active");
+}
+
+// ── Change 3: Sort Direction Indicators ──
+function updateSortArrows(tableId, col, asc) {
+  var ths = document.querySelectorAll("#" + tableId + " thead th");
+  for (var i = 0; i < ths.length; i++) {
+    ths[i].textContent = ths[i].textContent.replace(/ [\u25B2\u25BC]$/, "");
+  }
+  if (col >= 0 && col < ths.length) {
+    ths[col].textContent += asc ? " \u25B2" : " \u25BC";
+  }
 }
 
 // ── LTL DATA ──
@@ -285,14 +304,14 @@ new Chart(document.getElementById("costChart"), {
   options: { responsive: true, plugins: { legend: { position: "bottom" } } }
 });
 
-// Transit histogram
-var transitBuckets = {"2-4": 0, "5-6": 0, "7": 0, "8-9": 0, "10-14": 0};
+// Change 4: Transit histogram with updated bucket labels
+var transitBuckets = {"1-4": 0, "5-6": 0, "7": 0, "8-9": 0, "10+": 0};
 delivered.forEach(function(d) {
-  if (d.transitDays <= 4) transitBuckets["2-4"]++;
+  if (d.transitDays <= 4) transitBuckets["1-4"]++;
   else if (d.transitDays <= 6) transitBuckets["5-6"]++;
   else if (d.transitDays === 7) transitBuckets["7"]++;
   else if (d.transitDays <= 9) transitBuckets["8-9"]++;
-  else transitBuckets["10-14"]++;
+  else transitBuckets["10+"]++;
 });
 new Chart(document.getElementById("transitChart"), {
   type: "bar",
@@ -303,18 +322,104 @@ new Chart(document.getElementById("transitChart"), {
   options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
 });
 
-// State bar
+// Change 2: State Tile Grid Map (replaces bar chart)
 var stateCounts = {};
 DATA.forEach(function(d) { if (d.state) stateCounts[d.state] = (stateCounts[d.state] || 0) + 1; });
-var sortedStates = Object.entries(stateCounts).sort(function(a, b) { return b[1] - a[1]; });
-new Chart(document.getElementById("stateChart"), {
-  type: "bar",
-  data: {
-    labels: sortedStates.map(function(s) { return s[0]; }),
-    datasets: [{ label: "Shipments", data: sortedStates.map(function(s) { return s[1]; }), backgroundColor: "#2d6a4f" }]
-  },
-  options: { indexAxis: "y", responsive: true, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } }
-});
+
+(function() {
+  var tileW = 40, tileH = 30, gap = 2;
+  var stateGrid = {
+    "AK":[0,0],"ME":[0,10],
+    "WI":[1,5],"MI":[1,7],"VT":[1,8],"NH":[1,9],
+    "WA":[2,1],"ID":[2,2],"MT":[2,3],"ND":[2,4],"MN":[2,5],"IL":[2,6],"IN":[2,7],"OH":[2,8],"PA":[2,9],"NY":[2,10],"MA":[2,11],"RI":[2,12],"CT":[2,13],
+    "OR":[3,1],"NV":[3,2],"WY":[3,3],"SD":[3,4],"IA":[3,5],"MO":[3,6],"KY":[3,7],"WV":[3,8],"VA":[3,9],"NJ":[3,10],"DE":[3,11],"MD":[3,12],"DC":[3,13],
+    "CA":[4,1],"UT":[4,2],"CO":[4,3],"NE":[4,4],"KS":[4,5],"AR":[4,6],"TN":[4,7],"NC":[4,8],"SC":[4,9],
+    "AZ":[5,2],"NM":[5,3],"OK":[5,4],"LA":[5,5],"MS":[5,6],"AL":[5,7],"GA":[5,8],
+    "TX":[6,3],"FL":[6,8],
+    "HI":[7,0]
+  };
+
+  var maxCount = 0;
+  var stKeys = Object.keys(stateCounts);
+  for (var i = 0; i < stKeys.length; i++) {
+    if (stateCounts[stKeys[i]] > maxCount) maxCount = stateCounts[stKeys[i]];
+  }
+  if (maxCount === 0) maxCount = 1;
+
+  function interpolateColor(count) {
+    if (count === 0) return "#e8e8e8";
+    var t = count / maxCount;
+    var r = Math.round(232 + (45 - 232) * t);
+    var g = Math.round(232 + (106 - 232) * t);
+    var b = Math.round(232 + (79 - 232) * t);
+    return "rgb(" + r + "," + g + "," + b + ")";
+  }
+
+  var maxRow = 0, maxCol = 0;
+  var sKeys = Object.keys(stateGrid);
+  for (var i = 0; i < sKeys.length; i++) {
+    var pos = stateGrid[sKeys[i]];
+    if (pos[0] > maxRow) maxRow = pos[0];
+    if (pos[1] > maxCol) maxCol = pos[1];
+  }
+
+  var svgW = (maxCol + 1) * (tileW + gap);
+  var svgH = (maxRow + 1) * (tileH + gap) + 40;
+
+  var svgParts = ['<svg width="' + svgW + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg" style="font-family:Arial,sans-serif;font-size:10px">'];
+
+  for (var i = 0; i < sKeys.length; i++) {
+    var st = sKeys[i];
+    var pos = stateGrid[st];
+    var x = pos[1] * (tileW + gap);
+    var y = pos[0] * (tileH + gap);
+    var cnt = stateCounts[st] || 0;
+    var fill = interpolateColor(cnt);
+    var textColor = cnt > maxCount * 0.5 ? "#fff" : "#333";
+    svgParts.push('<g class="state-tile" data-state="' + st + '" data-count="' + cnt + '">');
+    svgParts.push('<rect x="' + x + '" y="' + y + '" width="' + tileW + '" height="' + tileH + '" fill="' + fill + '" rx="3" stroke="#fff" stroke-width="1"/>');
+    svgParts.push('<text x="' + (x + tileW/2) + '" y="' + (y + tileH/2 + 4) + '" text-anchor="middle" fill="' + textColor + '" font-size="10" font-weight="600">' + st + '</text>');
+    svgParts.push('</g>');
+  }
+
+  // Legend gradient bar
+  var legendY = (maxRow + 1) * (tileH + gap) + 10;
+  svgParts.push('<defs><linearGradient id="lgGrad" x1="0%" y1="0%" x2="100%" y2="0%">');
+  svgParts.push('<stop offset="0%" stop-color="#e8e8e8"/>');
+  svgParts.push('<stop offset="100%" stop-color="#2d6a4f"/>');
+  svgParts.push('</linearGradient></defs>');
+  svgParts.push('<rect x="100" y="' + legendY + '" width="200" height="12" fill="url(#lgGrad)" rx="3"/>');
+  svgParts.push('<text x="95" y="' + (legendY + 10) + '" text-anchor="end" fill="#666" font-size="10">0</text>');
+  svgParts.push('<text x="305" y="' + (legendY + 10) + '" fill="#666" font-size="10">' + maxCount + '</text>');
+
+  svgParts.push('</svg>');
+
+  var container = document.getElementById("stateMapContainer");
+  container.innerHTML = svgParts.join("");
+
+  // Tooltip
+  var tooltip = document.createElement("div");
+  tooltip.style.cssText = "display:none;position:absolute;background:#333;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;pointer-events:none;white-space:nowrap;z-index:100";
+  container.appendChild(tooltip);
+
+  var tiles = container.querySelectorAll(".state-tile");
+  tiles.forEach(function(g) {
+    g.addEventListener("mouseover", function(e) {
+      var st = g.getAttribute("data-state");
+      var cnt = g.getAttribute("data-count");
+      tooltip.textContent = st + ": " + cnt + " shipment" + (cnt !== "1" ? "s" : "");
+      tooltip.style.display = "block";
+    });
+    g.addEventListener("mousemove", function(e) {
+      var rect = container.getBoundingClientRect();
+      tooltip.style.left = (e.clientX - rect.left + 12) + "px";
+      tooltip.style.top = (e.clientY - rect.top - 30) + "px";
+    });
+    g.addEventListener("mouseout", function() {
+      tooltip.style.display = "none";
+    });
+  });
+})();
 
 // Cost scatter
 var costTimeData = DATA.filter(function(d) { return d.pickup; }).map(function(d) { return { x: d.pickup, y: d.charges, pro: d.pro }; });
@@ -331,7 +436,7 @@ new Chart(document.getElementById("costTimeChart"), {
   }
 });
 
-// LTL Table
+// LTL Table (Change 1: enhanced late shipment highlighting)
 function renderTable(filteredData) {
   var tbody = document.getElementById("tableBody");
   tbody.innerHTML = "";
@@ -340,7 +445,7 @@ function renderTable(filteredData) {
     if (d.daysLate > 0) tr.className = "late";
     else if (d.status === "Delivered") tr.className = "delivered";
     else tr.className = "intransit";
-    var onTimeStr = d.daysLate !== null ? (d.daysLate <= 0 ? "Yes" : d.daysLate + " days late") : "-";
+    var onTimeStr = d.daysLate !== null ? (d.daysLate <= 0 ? "Yes" : "\u26a0 " + d.daysLate + " days late") : "-";
     var sc = d.status === "Delivered" ? "status-delivered" : (d.statusShort === "OutForDelivery" ? "status-out" : "status-intransit");
     tr.innerHTML = "<td>" + d.pro + "</td>" +
       '<td><span class="status-badge ' + sc + '">' + d.status + '</span></td>' +
@@ -395,6 +500,7 @@ function sortTable(col) {
     return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
   });
   applyFilters();
+  updateSortArrows("shipTable", col, sortAsc);
 }
 renderTable(DATA);
 
@@ -441,7 +547,7 @@ new Chart(document.getElementById("errTypeChart"), {
   options: { responsive: true, plugins: { legend: { position: "bottom" } } }
 });
 
-// Weekly Trends Stacked Bar
+// Change 5: Weekly Trends Stacked Bar with Cost Trend Line
 var trendColors = {"A-Accommodation":"#e76f51","D-Delivered Damaged":"#e9c46a","L-Lost Part":"#264653","W-Warranty":"#2a9d8f"};
 var trendWeeks = ["Week 8", "Week 9", "Week 10", "Week 11"];
 var trendDatasets = ERR_TRENDS.map(function(t) {
@@ -451,12 +557,53 @@ var trendDatasets = ERR_TRENDS.map(function(t) {
     backgroundColor: trendColors[t.code] || "#999"
   };
 });
+
+// Compute weekly error costs from raw data
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+var weeklyCosts = trendWeeks.map(function(weekLabel) {
+  var weekNum = parseInt(weekLabel.replace(/\D/g, ""));
+  var cost = 0;
+  ERR_RAW.forEach(function(d) {
+    if (d.date) {
+      try {
+        var dt = new Date(d.date);
+        var wn = getWeekNumber(dt);
+        if (wn === weekNum) cost += d.cost;
+      } catch(e) {}
+    }
+  });
+  return cost;
+});
+
+trendDatasets.push({
+  label: "Total Cost ($)",
+  data: weeklyCosts,
+  type: "line",
+  borderColor: "#c0392b",
+  backgroundColor: "#c0392b",
+  yAxisID: "y1",
+  tension: 0.3,
+  pointRadius: 5,
+  fill: false,
+  order: 0
+});
+
 new Chart(document.getElementById("errTrendChart"), {
   type: "bar",
   data: { labels: trendWeeks, datasets: trendDatasets },
   options: {
     responsive: true,
-    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: "Error Count" } } },
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, beginAtZero: true, title: { display: true, text: "Error Count" } },
+      y1: { position: "right", beginAtZero: true, title: { display: true, text: "Cost ($)" }, grid: { drawOnChartArea: false } }
+    },
     plugins: { legend: { position: "bottom" } }
   }
 });
@@ -471,7 +618,7 @@ new Chart(document.getElementById("errCostChart"), {
   options: { responsive: true, plugins: { legend: { position: "bottom" } } }
 });
 
-// Top 10 Horizontal Bar
+// Change 8: Top 10 Horizontal Bar with updated tooltip
 new Chart(document.getElementById("errTop10Chart"), {
   type: "bar",
   data: {
@@ -482,41 +629,142 @@ new Chart(document.getElementById("errTop10Chart"), {
     indexAxis: "y",
     responsive: true,
     scales: { x: { beginAtZero: true, title: { display: true, text: "Cost ($)" } } },
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { var d = ERR_TOP10[ctx.dataIndex]; return d.code + " | $" + d.cost + " | " + d.so; } } } }
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { var d = ERR_TOP10[ctx.dataIndex]; var countStr = d.errorCount ? d.errorCount + " errors | " : ""; return countStr + d.code + " | $" + d.cost.toFixed(2); } } } }
   }
 });
 
-// RCA Table
-var rcaBody = document.getElementById("rcaBody");
-ERR_RCA.forEach(function(d) {
-  var tr = document.createElement("tr");
-  var riskCls = d.risk === "HIGH" ? "risk-high" : (d.risk === "MEDIUM" ? "risk-medium" : "risk-low");
-  tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.pattern + "</td><td>" + d.type + "</td><td>" + d.products + "</td><td>" + d.count + "</td><td><span class='" + riskCls + "'>" + d.risk + "</span></td><td>" + d.notes + "</td>";
-  rcaBody.appendChild(tr);
+// Change 6: RCA/CAPA cross-reference highlight functions
+var activeHighlight = null;
+function clearHighlights() {
+  document.querySelectorAll(".highlight-row,.dim-row").forEach(function(el) {
+    el.classList.remove("highlight-row","dim-row");
+  });
+  activeHighlight = null;
+}
+function highlightCapa(rcaId) {
+  if (activeHighlight === "capa-" + rcaId) { clearHighlights(); return; }
+  clearHighlights();
+  activeHighlight = "capa-" + rcaId;
+  var capaRows = document.querySelectorAll("#capaBody tr");
+  capaRows.forEach(function(r) {
+    if (r.getAttribute("data-capa-ref") === rcaId) r.classList.add("highlight-row");
+    else r.classList.add("dim-row");
+  });
+  document.getElementById("capaTable").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function highlightRca(rcaId) {
+  if (activeHighlight === "rca-" + rcaId) { clearHighlights(); return; }
+  clearHighlights();
+  activeHighlight = "rca-" + rcaId;
+  var rcaRows = document.querySelectorAll("#rcaBody tr");
+  rcaRows.forEach(function(r) {
+    if (r.getAttribute("data-rca-id") === rcaId) r.classList.add("highlight-row");
+    else r.classList.add("dim-row");
+  });
+  document.getElementById("rcaTable").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+document.addEventListener("click", function(e) {
+  if (!e.target.closest("#rcaTable") && !e.target.closest("#capaTable")) clearHighlights();
 });
 
-// CAPA Table
-var capaBody = document.getElementById("capaBody");
-ERR_CAPA.forEach(function(d) {
-  var tr = document.createElement("tr");
-  var prCls = d.priority === "HIGH" ? "priority-high" : (d.priority === "MEDIUM" ? "priority-medium" : "priority-low");
-  var stCls = d.status === "In Progress" ? "status-in-progress" : "status-planned";
-  tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.ref + "</td><td>" + d.action + "</td><td>" + d.owner + "</td><td>" + d.target + "</td><td><span class='" + stCls + "'>" + d.status + "</span></td><td><span class='" + prCls + "'>" + d.priority + "</span></td>";
-  capaBody.appendChild(tr);
-});
+// Change 9: RCA Table as function (with Change 6 click handlers)
+function renderRCATable() {
+  var rcaBody = document.getElementById("rcaBody");
+  rcaBody.innerHTML = "";
+  ERR_RCA.forEach(function(d) {
+    var tr = document.createElement("tr");
+    tr.className = "clickable-row";
+    tr.setAttribute("data-rca-id", d.id);
+    tr.addEventListener("click", function() { highlightCapa(d.id); });
+    var riskCls = d.risk === "HIGH" ? "risk-high" : (d.risk === "MEDIUM" ? "risk-medium" : "risk-low");
+    tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.pattern + "</td><td>" + d.type + "</td><td>" + d.products + "</td><td>" + d.count + "</td><td><span class='" + riskCls + "'>" + d.risk + "</span></td><td>" + d.notes + "</td>";
+    rcaBody.appendChild(tr);
+  });
+}
+renderRCATable();
 
-// Watch List Table
-var watchBody = document.getElementById("watchBody");
-ERR_WATCH.forEach(function(d) {
-  var tr = document.createElement("tr");
-  var alertCls = d.alert === "HIGH" ? "risk-high" : (d.alert === "MEDIUM" ? "risk-medium" : "risk-low");
-  var trendIcon = d.trend === "DOWN" ? "&#9660; " : (d.trend === "UP" ? "&#9650; " : "&#9654; ");
-  var trendColor = d.trend === "DOWN" ? "color:#2d6a4f" : (d.trend === "UP" ? "color:#c0392b" : "");
-  tr.innerHTML = "<td>" + d.product + "</td><td>" + d.code + "</td><td>" + d.current + "</td><td>" + d.historical + "</td><td><span style='" + trendColor + "'>" + trendIcon + d.trend + "</span></td><td><span class='" + alertCls + "'>" + d.alert + "</span></td>";
-  watchBody.appendChild(tr);
-});
+// CAPA Table as function (with Change 6 click handlers)
+function renderCAPATable() {
+  var capaBody = document.getElementById("capaBody");
+  capaBody.innerHTML = "";
+  ERR_CAPA.forEach(function(d) {
+    var tr = document.createElement("tr");
+    tr.className = "clickable-row";
+    tr.setAttribute("data-capa-ref", d.ref);
+    tr.addEventListener("click", function() { highlightRca(d.ref); });
+    var prCls = d.priority === "HIGH" ? "priority-high" : (d.priority === "MEDIUM" ? "priority-medium" : "priority-low");
+    var stCls = d.status === "In Progress" ? "status-in-progress" : "status-planned";
+    tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.ref + "</td><td>" + d.action + "</td><td>" + d.owner + "</td><td>" + d.target + "</td><td><span class='" + stCls + "'>" + d.status + "</span></td><td><span class='" + prCls + "'>" + d.priority + "</span></td>";
+    capaBody.appendChild(tr);
+  });
+}
+renderCAPATable();
 
-// Error Detail Table
+// Watch List Table as function
+function renderWatchTable() {
+  var watchBody = document.getElementById("watchBody");
+  watchBody.innerHTML = "";
+  ERR_WATCH.forEach(function(d) {
+    var tr = document.createElement("tr");
+    var alertCls = d.alert === "HIGH" ? "risk-high" : (d.alert === "MEDIUM" ? "risk-medium" : "risk-low");
+    var trendIcon = d.trend === "DOWN" ? "&#9660; " : (d.trend === "UP" ? "&#9650; " : "&#9654; ");
+    var trendColor = d.trend === "DOWN" ? "color:#2d6a4f" : (d.trend === "UP" ? "color:#c0392b" : "");
+    tr.innerHTML = "<td>" + d.product + "</td><td>" + d.code + "</td><td>" + d.current + "</td><td>" + d.historical + "</td><td><span style='" + trendColor + "'>" + trendIcon + d.trend + "</span></td><td><span class='" + alertCls + "'>" + d.alert + "</span></td>";
+    watchBody.appendChild(tr);
+  });
+}
+renderWatchTable();
+
+// Change 9: Sort functions for RCA, CAPA, Watch tables
+var rcaSortCol = -1, rcaSortAsc = true;
+function sortRCATable(col) {
+  if (rcaSortCol === col) rcaSortAsc = !rcaSortAsc;
+  else { rcaSortCol = col; rcaSortAsc = true; }
+  var keys = ["id","pattern","type","products","count","risk","notes"];
+  ERR_RCA.sort(function(a, b) {
+    var va = a[keys[col]], vb = b[keys[col]];
+    if (va === null || va === undefined) va = "";
+    if (vb === null || vb === undefined) vb = "";
+    if (typeof va === "number") return rcaSortAsc ? va - vb : vb - va;
+    return rcaSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+  renderRCATable();
+  updateSortArrows("rcaTable", col, rcaSortAsc);
+}
+
+var capaSortCol = -1, capaSortAsc = true;
+function sortCAPATable(col) {
+  if (capaSortCol === col) capaSortAsc = !capaSortAsc;
+  else { capaSortCol = col; capaSortAsc = true; }
+  var keys = ["id","ref","action","owner","target","status","priority"];
+  ERR_CAPA.sort(function(a, b) {
+    var va = a[keys[col]], vb = b[keys[col]];
+    if (va === null || va === undefined) va = "";
+    if (vb === null || vb === undefined) vb = "";
+    if (typeof va === "number") return capaSortAsc ? va - vb : vb - va;
+    return capaSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+  renderCAPATable();
+  updateSortArrows("capaTable", col, capaSortAsc);
+}
+
+var watchSortCol = -1, watchSortAsc = true;
+function sortWatchTable(col) {
+  if (watchSortCol === col) watchSortAsc = !watchSortAsc;
+  else { watchSortCol = col; watchSortAsc = true; }
+  var keys = ["product","code","current","historical","trend","alert"];
+  ERR_WATCH.sort(function(a, b) {
+    var va = a[keys[col]], vb = b[keys[col]];
+    if (va === null || va === undefined) va = "";
+    if (vb === null || vb === undefined) vb = "";
+    if (typeof va === "number") return watchSortAsc ? va - vb : vb - va;
+    return watchSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+  renderWatchTable();
+  updateSortArrows("watchTable", col, watchSortAsc);
+}
+
+// Change 7: Error Detail Table with Notes column
 function renderErrTable(filteredData) {
   var tbody = document.getElementById("errTableBody");
   tbody.innerHTML = "";
@@ -527,7 +775,10 @@ function renderErrTable(filteredData) {
     else if (d.code.startsWith("A-")) codeCls = "style='color:#e76f51;font-weight:600'";
     else if (d.code.startsWith("D-")) codeCls = "style='color:#e9c46a;font-weight:600'";
     else if (d.code.startsWith("L-")) codeCls = "style='color:#264653;font-weight:600'";
-    tr.innerHTML = "<td>" + d.so + "</td><td>" + d.status + "</td><td>" + d.product + "</td><td>" + d.ship + "</td><td>$" + d.cost.toFixed(2) + "</td><td>" + d.csr + "</td><td " + codeCls + ">" + d.code + "</td><td>" + d.date + "</td><td>" + d.match + "</td>";
+    var notesStr = d.notes || "";
+    var notesTrunc = notesStr.length > 30 ? notesStr.substring(0, 30) + "..." : notesStr;
+    var notesTitle = notesStr.length > 30 ? ' title="' + notesStr.replace(/"/g, '&quot;') + '"' : '';
+    tr.innerHTML = "<td>" + d.so + "</td><td>" + d.status + "</td><td>" + d.product + "</td><td>" + d.ship + "</td><td>$" + d.cost.toFixed(2) + "</td><td>" + d.csr + "</td><td " + codeCls + ">" + d.code + "</td><td>" + d.date + "</td><td>" + d.match + "</td><td" + notesTitle + ">" + notesTrunc + "</td>";
     tbody.appendChild(tr);
   });
 }
@@ -563,7 +814,7 @@ var errSortCol = -1, errSortAsc = true;
 function sortErrTable(col) {
   if (errSortCol === col) errSortAsc = !errSortAsc;
   else { errSortCol = col; errSortAsc = true; }
-  var keys = ["so","status","product","ship","cost","csr","code","date","match"];
+  var keys = ["so","status","product","ship","cost","csr","code","date","match","notes"];
   ERR_RAW.sort(function(a, b) {
     var va = a[keys[col]], vb = b[keys[col]];
     if (va === null || va === undefined) va = "";
@@ -572,6 +823,7 @@ function sortErrTable(col) {
     return errSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
   });
   applyErrFilters();
+  updateSortArrows("errTable", col, errSortAsc);
 }
 renderErrTable(ERR_RAW);
 
