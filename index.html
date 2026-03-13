@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WPP Operations Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1B3A4B 0%,#2d6a4f 100%);color:white;padding:24px 40px}
+.header h1{font-size:28px;font-weight:700}
+.header p{font-size:14px;opacity:0.85;margin-top:4px}
+.container{max-width:1400px;margin:0 auto;padding:24px}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.kpi-card{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center}
+.kpi-card .value{font-size:32px;font-weight:700;color:#1B3A4B}
+.kpi-card .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.kpi-card .sub{font-size:11px;color:#aaa;margin-top:2px}
+.kpi-card.green .value{color:#2d6a4f}
+.kpi-card.red .value{color:#c0392b}
+.kpi-card.blue .value{color:#2980b9}
+.kpi-card.orange .value{color:#e67e22}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+.chart-card{background:white;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.chart-card h3{font-size:16px;color:#1B3A4B;margin-bottom:16px;border-bottom:2px solid #e0e0e0;padding-bottom:8px}
+.chart-card canvas{max-height:300px}
+.full-width{grid-column:1/-1}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#1B3A4B;color:white;padding:10px 8px;text-align:left;position:sticky;top:0;cursor:pointer}
+th:hover{background:#2d6a4f}
+td{padding:8px;border-bottom:1px solid #e8e8e8}
+tr:hover td{background:#f5f9fc}
+tr.late td{background:#fff3f3}
+tr.delivered td:nth-child(2){color:#2d6a4f;font-weight:600}
+tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
+.table-wrap{max-height:500px;overflow-y:auto;border-radius:8px}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.status-delivered{background:#d4edda;color:#155724}
+.status-intransit{background:#fff3cd;color:#856404}
+.status-out{background:#cce5ff;color:#004085}
+.filter-bar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-bar select,.filter-bar input{padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px}
+.filter-bar label{font-size:12px;color:#666;font-weight:600}
+.section-title{font-size:20px;color:#1B3A4B;margin:24px 0 16px;font-weight:700}
+.print-btn{background:#1B3A4B;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px}
+.print-btn:hover{background:#2d6a4f}
+
+/* TAB NAVIGATION */
+.tab-nav{display:flex;gap:0;margin:0;padding:0 40px;background:linear-gradient(135deg,#142e3b 0%,#245540 100%)}
+.tab-btn{padding:14px 32px;border:none;background:transparent;color:rgba(255,255,255,0.6);font-size:15px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s}
+.tab-btn:hover{color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.05)}
+.tab-btn.active{color:white;border-bottom:3px solid #e9c46a;background:rgba(255,255,255,0.08)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Error-specific */
+.risk-high{background:#f8d7da;color:#721c24;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.risk-medium{background:#fff3cd;color:#856404;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.risk-low{background:#d4edda;color:#155724;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.priority-high{color:#c0392b;font-weight:700}
+.priority-medium{color:#e67e22;font-weight:700}
+.priority-low{color:#27ae60;font-weight:700}
+.status-in-progress{background:#cce5ff;color:#004085;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.status-planned{background:#fff3cd;color:#856404;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.capa-table td,.capa-table th{font-size:12px;padding:8px 10px}
+.err-table{font-size:11px}
+.err-table td,.err-table th{padding:6px 8px}
+
+@media print{.header{break-after:avoid}.no-print{display:none}.chart-card{break-inside:avoid}.tab-nav{display:none}}
+@media(max-width:768px){.charts-row{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#e8f5e9;color:#2d6a4f;font-size:12px;border-bottom:1px solid #c8e6c9">Dashboard last rebuilt: March 13, 2026 at 10:19 AM</div>
+<div class="header">
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<div><h1>Woodland Power Products</h1>
+<p>Operations Dashboard | LTL Shipping & Error Tracking | Data as of March 12, 2026</p></div>
+<button class="print-btn no-print" onclick="window.print()">Print / Export PDF</button>
+</div></div>
+
+<!-- TAB NAVIGATION -->
+<div class="tab-nav no-print">
+<button class="tab-btn active" onclick="switchTab('ltl')">LTL Shipping</button>
+<button class="tab-btn" onclick="switchTab('errors')">Errors &amp; Quality</button>
+</div>
+
+<!-- ═══ TAB 1: LTL SHIPPING ═══ -->
+<div id="tab-ltl" class="tab-content active">
+<div class="container">
+<div class="kpi-row" id="kpiRow"></div>
+<div class="charts-row">
+<div class="chart-card"><h3>Delivery Status Breakdown</h3><canvas id="statusChart"></canvas></div>
+<div class="chart-card"><h3>Weekly Shipping Volume &amp; Cost</h3><canvas id="weeklyChart"></canvas></div>
+<div class="chart-card"><h3>Cost Breakdown</h3><canvas id="costChart"></canvas></div>
+<div class="chart-card"><h3>Transit Time Distribution (Delivered)</h3><canvas id="transitChart"></canvas></div>
+<div class="chart-card"><h3>Shipments by State</h3><canvas id="stateChart"></canvas></div>
+<div class="chart-card"><h3>Cost per Shipment Over Time</h3><canvas id="costTimeChart"></canvas></div>
+</div>
+<div class="section-title">Shipment Detail Table</div>
+<div class="filter-bar no-print">
+<div><label>Status:</label><br><select id="filterStatus"><option value="all">All</option></select></div>
+<div><label>State:</label><br><select id="filterState"><option value="all">All States</option></select></div>
+<div><label>Search PRO/City:</label><br><input type="text" id="filterSearch" placeholder="Search..."></div>
+</div>
+<div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
+<table id="shipTable"><thead><tr><th onclick="sortTable(0)">PRO #</th><th onclick="sortTable(1)">Status</th><th onclick="sortTable(2)">Pickup</th><th onclick="sortTable(3)">Promised</th><th onclick="sortTable(4)">Delivered</th><th onclick="sortTable(5)">Days</th><th onclick="sortTable(6)">On Time</th><th onclick="sortTable(7)">City</th><th onclick="sortTable(8)">State</th><th onclick="sortTable(9)">Charges</th><th onclick="sortTable(10)">Weight</th><th onclick="sortTable(11)">$/lb</th><th onclick="sortTable(12)">Payment</th></tr></thead><tbody id="tableBody"></tbody></table>
+</div></div>
+<div style="text-align:center;padding:24px;color:#aaa;font-size:12px;">Woodland Power Products | LTL Dashboard | Data as of March 12, 2026 | Prepared by Manufacturing</div>
+</div>
+</div>
+
+<!-- ═══ TAB 2: ERRORS & QUALITY ═══ -->
+<div id="tab-errors" class="tab-content">
+<div class="container">
+
+<!-- Error KPIs -->
+<div class="kpi-row" id="errKpiRow"></div>
+
+<div class="charts-row">
+<div class="chart-card"><h3>Errors by Reason Code</h3><canvas id="errTypeChart"></canvas></div>
+<div class="chart-card"><h3>Weekly Error Trends</h3><canvas id="errTrendChart"></canvas></div>
+<div class="chart-card"><h3>Error Cost by Type</h3><canvas id="errCostChart"></canvas></div>
+<div class="chart-card"><h3>Top 10 Errors by Cost</h3><canvas id="errTop10Chart"></canvas></div>
+</div>
+
+<!-- Root Cause Analysis -->
+<div class="section-title">Root Cause Analysis (RCA)</div>
+<div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
+<table class="capa-table" id="rcaTable"><thead><tr>
+<th>Pattern ID</th><th>Pattern</th><th>Type</th><th>Products Affected</th><th>Count</th><th>Risk Level</th><th>Notes</th>
+</tr></thead><tbody id="rcaBody"></tbody></table>
+</div></div>
+
+<!-- CAPA Tracking -->
+<div class="section-title">Corrective Actions (CAPA)</div>
+<div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
+<table class="capa-table" id="capaTable"><thead><tr>
+<th>CAPA ID</th><th>Pattern Ref</th><th>Action</th><th>Owner</th><th>Target Date</th><th>Status</th><th>Priority</th>
+</tr></thead><tbody id="capaBody"></tbody></table>
+</div></div>
+
+<!-- Watch List -->
+<div class="section-title">Product Watch List</div>
+<div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
+<table class="capa-table" id="watchTable"><thead><tr>
+<th>Product</th><th>Reason Code</th><th>Current Count</th><th>Historical Count</th><th>Trend</th><th>Alert Level</th>
+</tr></thead><tbody id="watchBody"></tbody></table>
+</div></div>
+
+<!-- Error Detail Table -->
+<div class="section-title">Error Detail Table</div>
+<div class="filter-bar no-print">
+<div><label>Reason Code:</label><br><select id="errFilterCode"><option value="all">All</option></select></div>
+<div><label>Status:</label><br><select id="errFilterStatus"><option value="all">All</option></select></div>
+<div><label>Search Product/SO:</label><br><input type="text" id="errFilterSearch" placeholder="Search..."></div>
+</div>
+<div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
+<table class="err-table" id="errTable"><thead><tr>
+<th onclick="sortErrTable(0)">Sales Order</th><th onclick="sortErrTable(1)">Status</th><th onclick="sortErrTable(2)">Product</th><th onclick="sortErrTable(3)">Ship From</th><th onclick="sortErrTable(4)">Cost</th><th onclick="sortErrTable(5)">CSR</th><th onclick="sortErrTable(6)">Reason Code</th><th onclick="sortErrTable(7)">Date</th><th onclick="sortErrTable(8)">Pattern</th>
+</tr></thead><tbody id="errTableBody"></tbody></table>
+</div></div>
+
+<div style="text-align:center;padding:24px;color:#aaa;font-size:12px;">Woodland Power Products | Error &amp; Quality Dashboard | Data as of March 12, 2026 | Prepared by Manufacturing</div>
+</div>
+</div>
+
+<script>
+// ── Tab switching ──
+function switchTab(tabId) {
+  document.querySelectorAll(".tab-content").forEach(function(el) { el.classList.remove("active"); });
+  document.querySelectorAll(".tab-btn").forEach(function(el) { el.classList.remove("active"); });
+  document.getElementById("tab-" + tabId).classList.add("active");
+  var btns = document.querySelectorAll(".tab-btn");
+  if (tabId === "ltl") btns[0].classList.add("active");
+  else btns[1].classList.add("active");
+}
+
+// ── LTL DATA ──
+const DATA = [{"pro": "043984210", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-03", "delivery": "2026-02-10", "promised": "2026-02-10", "city": "CHAPIN", "state": "SC", "zip": "29036", "charges": 326.67, "gross": 326.67, "discount": -1533.51, "fuel": 76.35, "accessorial": 0, "weight": 347, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/10/26 1119 (DEL SIG= Mr Web) PER CONSIGNEE REQUEST.", "payment": "Paid"}, {"pro": "043984240", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-05", "delivery": "2026-02-13", "promised": "2026-02-12", "city": "AIKEN", "state": "SC", "zip": "29803", "charges": 348.88, "gross": 348.88, "discount": -1899.18, "fuel": 80.78, "accessorial": 6.66, "weight": 410, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/13/26 1232 (DEL SIG= Deborah ZellA) PER CONSIGNEE REQUEST.", "payment": "Paid"}, {"pro": "043984259", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-06", "delivery": "2026-02-12", "promised": "2026-02-12", "city": "ARCADIA", "state": "FL", "zip": "34266", "charges": 560.38, "gross": 560.38, "discount": -1963.01, "fuel": 92.15, "accessorial": 170.0, "weight": 268, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/12/26 1500 (DEL SIG= rod nelson) PER CONSIGNEE REQUEST.", "payment": "Paid"}, {"pro": "043984280", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-09", "delivery": "2026-02-17", "promised": "2026-02-17", "city": "LEESVILLE", "state": "SC", "zip": "29070", "charges": 327.67, "gross": 327.67, "discount": -1244.15, "fuel": 77.35, "accessorial": 0, "weight": 276, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/17/26 1612 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "Paid"}, {"pro": "043984300", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-10", "delivery": "2026-02-20", "promised": "2026-02-20", "city": "LEAKESVILLE", "state": "MS", "zip": "39451", "charges": 390.38, "gross": 390.38, "discount": -1681.88, "fuel": 92.15, "accessorial": 0, "weight": 264, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/20/26 1223 (DEL SIG= avery champagne) PER CONSIGNEE REQUEST.", "payment": "Paid"}, {"pro": "043984317", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-12", "delivery": "2026-02-26", "promised": "2026-02-19", "city": "GRAYSON", "state": "LA", "zip": "71435", "charges": 497.08, "gross": 497.08, "discount": -3169.26, "fuel": 117.34, "accessorial": 0, "weight": 400, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/26/26.", "payment": "NotPaid"}, {"pro": "043984318", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-12", "delivery": "2026-02-19", "promised": "2026-02-19", "city": "CULVER", "state": "IN", "zip": "46511", "charges": 327.67, "gross": 327.67, "discount": -1401.46, "fuel": 77.35, "accessorial": 0, "weight": 312, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/19/26 1102 (DEL SIG= Michelle allyn) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984319", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-12", "delivery": "2026-02-26", "promised": "2026-02-26", "city": "PERALTA", "state": "NM", "zip": "87042", "charges": 796.47, "gross": 796.47, "discount": -4881.78, "fuel": 186.44, "accessorial": 6.66, "weight": 390, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/26/26 1108 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984346", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-13", "delivery": "2026-02-19", "promised": "2026-02-19", "city": "ACCOMAC", "state": "VA", "zip": "23301", "charges": 315.48, "gross": 315.48, "discount": -1836.64, "fuel": 74.47, "accessorial": 0, "weight": 405, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/19/26 (DEL SIG= BANALY CONNER).", "payment": "NotPaid"}, {"pro": "043984368", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-17", "delivery": "2026-02-24", "promised": "2026-02-24", "city": "EMMET", "state": "AR", "zip": "71835", "charges": 558.17, "gross": 558.17, "discount": -1242.34, "fuel": 95.17, "accessorial": 155.0, "weight": 241, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/24/26 1118 (DEL SIG= Curtis dorman) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984383", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-18", "delivery": "2026-02-25", "promised": "2026-02-25", "city": "STILWELL", "state": "KS", "zip": "66085", "charges": 391.28, "gross": 391.28, "discount": -1911.61, "fuel": 93.05, "accessorial": 0, "weight": 312, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/25/26 1032 (DEL SIG= dennis miscevich) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984384", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-18", "delivery": "2026-02-24", "promised": "2026-02-24", "city": "INMAN", "state": "SC", "zip": "29349", "charges": 307.66, "gross": 307.66, "discount": -777.99, "fuel": 73.16, "accessorial": 0, "weight": 362, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/24/26 1221 (DEL SIG= mike lagrone) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984385", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-18", "delivery": "2026-03-04", "promised": "2026-03-04", "city": "CHIPLEY", "state": "FL", "zip": "32428", "charges": 453.67, "gross": 453.67, "discount": -2843.51, "fuel": 106.3, "accessorial": 6.66, "weight": 365, "packages": 1, "short": 1, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/04/26 0741 (DEL SIG= dean hitzelderger) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984392", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-18", "delivery": "2026-02-25", "promised": "2026-02-25", "city": "CLINTON", "state": "LA", "zip": "70722", "charges": 391.28, "gross": 391.28, "discount": -1854.99, "fuel": 93.05, "accessorial": 0, "weight": 242, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/25/26 1221 (DEL SIG= royce estelle) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984407", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-19", "delivery": "2026-02-26", "promised": "2026-02-26", "city": "JESUP", "state": "GA", "zip": "31545", "charges": 376.15, "gross": 376.15, "discount": -1935.87, "fuel": 87.87, "accessorial": 6.66, "weight": 360, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/26/26 1737 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984408", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-19", "delivery": "2026-02-25", "promised": "2026-02-25", "city": "COTTONTOWN", "state": "TN", "zip": "37048", "charges": 328.42, "gross": 328.42, "discount": -1467.86, "fuel": 78.1, "accessorial": 0, "weight": 295, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/25/26 1001 (DEL SIG= brian bruce) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984409", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-19", "delivery": "2026-02-27", "promised": "2026-02-27", "city": "RAVENEL", "state": "SC", "zip": "29470", "charges": 353.56, "gross": 353.56, "discount": -1957.62, "fuel": 84.08, "accessorial": 0, "weight": 458, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/27/26 0953 (DEL SIG= nehemiah youngthunder) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984410", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-19", "delivery": "2026-02-27", "promised": "2026-02-27", "city": "TEMPLE", "state": "TX", "zip": "76502", "charges": 508.94, "gross": 508.94, "discount": -3237.44, "fuel": 121.03, "accessorial": 0, "weight": 389, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/27/26 0835 (DEL SIG= CHRISTOPHER JEURISSEN) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984412", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-19", "delivery": "2026-02-27", "promised": "2026-02-27", "city": "WHEATFIELD", "state": "IN", "zip": "46392", "charges": 328.42, "gross": 328.42, "discount": -1871.18, "fuel": 78.1, "accessorial": 0, "weight": 366, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/27/26 0846 (DEL SIG= phillip angelo) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984425", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-20", "delivery": "2026-02-26", "promised": "2026-02-26", "city": "CALEDONIA", "state": "MI", "zip": "49316", "charges": 328.42, "gross": 328.42, "discount": -1572.02, "fuel": 78.1, "accessorial": 0, "weight": 354, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/26/26 1004 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984435", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-20", "delivery": "2026-02-25", "promised": "2026-02-25", "city": "ROBINSON", "state": "IL", "zip": "62454", "charges": 361.4, "gross": 361.4, "discount": -2078.94, "fuel": 85.94, "accessorial": 0, "weight": 417, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/25/26 1152 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984438", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-20", "delivery": "2026-02-26", "promised": "2026-02-26", "city": "WOOD HEIGHTS", "state": "MO", "zip": "64024", "charges": 316.85, "gross": 316.85, "discount": -1015.38, "fuel": 75.35, "accessorial": 0, "weight": 307, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/26/26 0900 (DEL SIG= marten perks) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984452", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-24", "delivery": "2026-02-26", "promised": "2026-02-26", "city": "ISLE LA MOTTE", "state": "VT", "zip": "5463", "charges": 370.64, "gross": 370.64, "discount": -726.99, "fuel": 88.14, "accessorial": 0, "weight": 439, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 02/26/26 1148 (DEL SIG= sam dam) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984453", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-24", "delivery": "2026-03-04", "promised": "2026-03-05", "city": "BREWTON", "state": "AL", "zip": "36426", "charges": 391.28, "gross": 391.28, "discount": -1619.41, "fuel": 93.05, "accessorial": 0, "weight": 281, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/04/26 1222 (DEL SIG= Eddie Ryals) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984454", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-24", "delivery": "2026-03-05", "promised": "2026-03-05", "city": "MOUNT VERNON", "state": "IL", "zip": "62864", "charges": 328.42, "gross": 328.42, "discount": -1688.52, "fuel": 78.1, "accessorial": 0, "weight": 351, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/05/26 1254 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984455", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-24", "delivery": "2026-03-02", "promised": "2026-03-02", "city": "DELAND", "state": "FL", "zip": "32720", "charges": 391.28, "gross": 391.28, "discount": -2288.87, "fuel": 93.05, "accessorial": 0, "weight": 352, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/02/26 1139 (DEL SIG= brian grzanich) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984456", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-25", "delivery": "2026-03-03", "promised": "2026-03-03", "city": "STILLWATER", "state": "OK", "zip": "74075", "charges": 421.94, "gross": 421.94, "discount": -3042.84, "fuel": 102.53, "accessorial": 0, "weight": 425, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/03/26 1125 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984457", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-24", "delivery": "2026-03-04", "promised": "2026-03-04", "city": "PANAMA CITY", "state": "FL", "zip": "32404", "charges": 400.47, "gross": 400.47, "discount": -2547.48, "fuel": 95.23, "accessorial": 0, "weight": 327, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/04/26 0852 (DEL SIG= tommy costello) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984461", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-24", "delivery": "2026-03-06", "promised": "2026-03-03", "city": "DE WITT", "state": "MI", "zip": "48820", "charges": 283.51, "gross": 283.51, "discount": -1400.23, "fuel": 67.42, "accessorial": 0, "weight": 314, "packages": 1, "short": 1, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/06/26 0948 (DEL SIG= anthony stoker) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984481", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-25", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "CALDWELL", "state": "TX", "zip": "77836", "charges": 510.99, "gross": 510.99, "discount": -3228.33, "fuel": 124.17, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1610 (DEL SIG= Melinda Stojanik) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984482", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-25", "delivery": "2026-03-05", "promised": "2026-03-05", "city": "SPARTANSBURG", "state": "PA", "zip": "16434", "charges": 283.75, "gross": 283.75, "discount": -1560.4, "fuel": 68.95, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/05/26 0945 (DEL SIG= William Keith) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984483", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-25", "delivery": "2026-03-05", "promised": "2026-03-05", "city": "SANTA ROSA BEACH", "state": "FL", "zip": "32459", "charges": 648.44, "gross": 648.44, "discount": -3022.69, "fuel": 116.26, "accessorial": 170.0, "weight": 388, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/05/26 1400 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984505", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-26", "delivery": "2026-03-04", "promised": "2026-03-04", "city": "MARSHALL", "state": "WI", "zip": "53559", "charges": 330.67, "gross": 330.67, "discount": -1897.3, "fuel": 80.35, "accessorial": 0, "weight": 435, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/04/26 1209 (DEL SIG= Mary Lou ..) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984506", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-26", "delivery": "2026-03-03", "promised": "2026-03-04", "city": "WEST POINT", "state": "MS", "zip": "39773", "charges": 393.96, "gross": 393.96, "discount": -1688.06, "fuel": 95.73, "accessorial": 0, "weight": 304, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/03/26 0907 (DEL SIG= don haughton) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984507", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-27", "delivery": "2026-03-06", "promised": "2026-03-06", "city": "DOTHAN", "state": "AL", "zip": "36301", "charges": 393.96, "gross": 393.96, "discount": -1910.79, "fuel": 95.73, "accessorial": 0, "weight": 370, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/06/26 1413 (DEL SIG= Gladys rudd) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984525", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-27", "delivery": "2026-03-09", "promised": "2026-03-09", "city": "HASTINGS", "state": "MN", "zip": "55033", "charges": 393.96, "gross": 393.96, "discount": -2633.49, "fuel": 95.73, "accessorial": 0, "weight": 416, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/09/26 1006 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984526", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-27", "delivery": "2026-03-06", "promised": "2026-03-06", "city": "KALAMAZOO", "state": "MI", "zip": "49009", "charges": 330.67, "gross": 330.67, "discount": -1659.67, "fuel": 80.35, "accessorial": 0, "weight": 368, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/06/26 1330 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984527", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-27", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "MER ROUGE", "state": "LA", "zip": "71261", "charges": 402.63, "gross": 402.63, "discount": -2543.72, "fuel": 97.84, "accessorial": 0, "weight": 320, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1138 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984528", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-27", "delivery": "2026-03-05", "promised": "2026-03-03", "city": "WRIGHTSVILLE", "state": "PA", "zip": "17368", "charges": 240.55, "gross": 240.55, "discount": -1322.9, "fuel": 58.45, "accessorial": 0, "weight": 448, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/05/26 0919 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984529", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-02-27", "delivery": "2026-03-06", "promised": "2026-03-06", "city": "CORTLAND", "state": "OH", "zip": "44410", "charges": 251.65, "gross": 251.65, "discount": -756.48, "fuel": 61.15, "accessorial": 0, "weight": 289, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/06/26 1125 (DEL SIG= jill slusser) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984562", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-02", "delivery": "2026-03-12", "promised": "2026-03-12", "city": "CHATSWORTH", "state": "GA", "zip": "30705", "charges": 330.91, "gross": 330.91, "discount": -804.72, "fuel": 80.41, "accessorial": 0, "weight": 311, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/12/26 1033 (DEL SIG= jose Rodriguez) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984563", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-02", "delivery": "", "promised": "2026-03-16", "city": "LONGVIEW", "state": "TX", "zip": "75605", "charges": 461.12, "gross": 461.12, "discount": -2448.86, "fuel": 112.05, "accessorial": 0, "weight": 305, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT TYLER, TX AND IS AWAITING DELIVERY.", "payment": "NotPaid"}, {"pro": "043984564", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-02", "delivery": "2026-03-10", "promised": "2026-03-10", "city": "DEL VALLE", "state": "TX", "zip": "78617", "charges": 461.12, "gross": 461.12, "discount": -2552.8, "fuel": 112.05, "accessorial": 0, "weight": 292, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/10/26 1550 (DEL SIG= Rodney Stewart) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984565", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-02", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "WHITE BEAR LAKE", "state": "MN", "zip": "55110", "charges": 393.96, "gross": 393.96, "discount": -1921.37, "fuel": 95.73, "accessorial": 0, "weight": 291, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1520 (DEL SIG= matt kk) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984566", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-02", "delivery": "2026-03-06", "promised": "2026-03-06", "city": "HARMONY", "state": "PA", "zip": "16037", "charges": 270.79, "gross": 270.79, "discount": -1489.11, "fuel": 65.8, "accessorial": 0, "weight": 351, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/06/26 1333 (DEL SIG= Nicholas Pcsolar) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984597", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-03", "delivery": "2026-03-12", "promised": "2026-03-12", "city": "SMITHFIELD", "state": "VA", "zip": "23430", "charges": 250.33, "gross": 250.33, "discount": -850.82, "fuel": 60.83, "accessorial": 0, "weight": 288, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/12/26 1034 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984598", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-03", "delivery": "2026-03-10", "promised": "2026-03-10", "city": "PRINCE FREDERICK", "state": "MD", "zip": "20678", "charges": 308.39, "gross": 308.39, "discount": -1779.06, "fuel": 74.94, "accessorial": 0, "weight": 321, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/10/26 1230 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984599", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-03", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "SHANNON", "state": "MS", "zip": "38868", "charges": 393.96, "gross": 393.96, "discount": -1831.93, "fuel": 95.73, "accessorial": 0, "weight": 334, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 0715 (DEL SIG= DANIEL MCCULLOUGH) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984600", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-03", "delivery": "2026-03-10", "promised": "2026-03-10", "city": "BRANDON", "state": "MS", "zip": "39042", "charges": 393.96, "gross": 393.96, "discount": -1799.27, "fuel": 95.73, "accessorial": 0, "weight": 317, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/10/26 1327 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984601", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-03", "delivery": "", "promised": "2026-03-11", "city": "YELM", "state": "WA", "zip": "98597", "charges": 667.66, "gross": 667.66, "discount": -4651.93, "fuel": 162.24, "accessorial": 0, "weight": 396, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT HAS BEEN DIRECTED TO CONNECTING CARRIER (TMSC).", "payment": "NotPaid"}, {"pro": "043984602", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-03", "delivery": "", "promised": "2026-03-13", "city": "JACKSON", "state": "MI", "zip": "49203", "charges": 285.45, "gross": 285.45, "discount": -1542.53, "fuel": 69.36, "accessorial": 0, "weight": 354, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS OUT FOR DELIVERY AT LANSING, MI.", "payment": "NotPaid"}, {"pro": "043984603", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-03", "delivery": "2026-03-10", "promised": "2026-03-10", "city": "NEW FRANKEN", "state": "WI", "zip": "54229", "charges": 393.96, "gross": 393.96, "discount": -2211.58, "fuel": 95.73, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/10/26 1215 (DEL SIG= eric Westlake) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984604", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-03", "delivery": "", "promised": "2026-03-13", "city": "BATTLE GROUND", "state": "WA", "zip": "98604", "charges": 647.87, "gross": 647.87, "discount": -4467.71, "fuel": 155.81, "accessorial": 6.66, "weight": 375, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT PORTLAND, OR AND IS AWAITING DELIVERY.", "payment": "NotPaid"}, {"pro": "043984605", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-03", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "SILVERHILL", "state": "AL", "zip": "36576", "charges": 455.61, "gross": 455.61, "discount": -2482.13, "fuel": 110.71, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1310 (DEL SIG= Barrett Bischoff) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984635", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-04", "delivery": "2026-03-12", "promised": "2026-03-12", "city": "BRISTOL", "state": "IN", "zip": "46507", "charges": 287.4, "gross": 287.4, "discount": -1742.21, "fuel": 71.31, "accessorial": 0, "weight": 420, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/12/26 0922 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984641", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-05", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "WATERTOWN", "state": "WI", "zip": "53094", "charges": 332.93, "gross": 332.93, "discount": -1543.22, "fuel": 82.61, "accessorial": 0, "weight": 304, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1249 (DEL SIG= Daniel keeser) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984642", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-04", "delivery": "2026-03-10", "promised": "2026-03-10", "city": "WINDSOR", "state": "MO", "zip": "65360", "charges": 396.65, "gross": 396.65, "discount": -2406.77, "fuel": 98.42, "accessorial": 0, "weight": 417, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/10/26 1135 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984663", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-05", "delivery": "", "promised": "2026-03-18", "city": "LUMBERTON", "state": "TX", "zip": "77657", "charges": 499.2, "gross": 499.2, "discount": -3090.67, "fuel": 122.21, "accessorial": 6.66, "weight": 395, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT HOUSTON, TX AND IS BEING SCHEDULED FOR DELIVERY.", "payment": "NotPaid"}, {"pro": "043984664", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-05", "delivery": "", "promised": "2026-03-13", "city": "ROCKY MOUNT", "state": "NC", "zip": "27801", "charges": 297.92, "gross": 297.92, "discount": -722.6, "fuel": 73.92, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS OUT FOR DELIVERY AT KINSTON, NC.", "payment": "NotPaid"}, {"pro": "043984665", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-05", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "MATTHEWS", "state": "NC", "zip": "28104", "charges": 311.82, "gross": 311.82, "discount": -1626.28, "fuel": 77.37, "accessorial": 0, "weight": 420, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1258 (DEL SIG= james marine) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984666", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-05", "delivery": "2026-03-10", "promised": "2026-03-10", "city": "OLIVE BRANCH", "state": "MS", "zip": "38654", "charges": 418.62, "gross": 418.62, "discount": -2375.45, "fuel": 103.87, "accessorial": 0, "weight": 435, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/10/26 1240 (DEL SIG= Larry Beard) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984667", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-05", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "MOORESVILLE", "state": "NC", "zip": "28115", "charges": 297.92, "gross": 297.92, "discount": -750.29, "fuel": 73.92, "accessorial": 0, "weight": 350, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 1240 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984686", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-05", "delivery": "", "promised": "2026-03-10", "city": "WARFIELD", "state": "VA", "zip": "23889", "charges": 252.04, "gross": 252.04, "discount": -853.3, "fuel": 62.54, "accessorial": 0, "weight": 291, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT HAS BEEN DIRECTED TO MARKETING PARTNER (MHSH).", "payment": "NotPaid"}, {"pro": "043984709", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-06", "delivery": "", "promised": "2026-03-16", "city": "EVERGREEN", "state": "CO", "zip": "80439", "charges": 464.26, "gross": 464.26, "discount": -3265.61, "fuel": 115.19, "accessorial": 0, "weight": 332, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT DEPARTED CRESTON, IA ENROUTE TO DENVER, CO (WITH AN ETA OF 03/14 AT 03:42) LOADED TO DENVER, CO.", "payment": "NotPaid"}, {"pro": "043984710", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-06", "delivery": "2026-03-11", "promised": "2026-03-11", "city": "HONEOYE FALLS", "state": "NY", "zip": "14472", "charges": 285.95, "gross": 285.95, "discount": -818.58, "fuel": 70.95, "accessorial": 0, "weight": 341, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/11/26 0933 (DEL SIG= jane pagano) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984727", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-09", "delivery": "", "promised": "2026-03-18", "city": "KALKASKA", "state": "MI", "zip": "49646", "charges": 341.85, "gross": 341.85, "discount": -2058.52, "fuel": 84.82, "accessorial": 0, "weight": 412, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT KALKASKA, MI AND IS AWAITING DELIVERY.", "payment": "NotPaid"}, {"pro": "043984728", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-09", "delivery": "", "promised": "2026-03-13", "city": "ROGERSVILLE", "state": "MO", "zip": "65742", "charges": 396.65, "gross": 396.65, "discount": -2354.66, "fuel": 98.42, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS OUT FOR DELIVERY AT SPRINGFIELD, MO.", "payment": "NotPaid"}, {"pro": "043984729", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-09", "delivery": "", "promised": "2026-03-12", "city": "PLYMOUTH", "state": "IN", "zip": "46563", "charges": 332.93, "gross": 332.93, "discount": -1280.17, "fuel": 82.61, "accessorial": 0, "weight": 285, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT CARLISLE, PA LOADED TO SOUTH BEND, IN AND IS READY FOR DISPATCH.", "payment": "NotPaid"}, {"pro": "043984730", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-09", "delivery": "", "promised": "2026-03-16", "city": "DOZIER", "state": "AL", "zip": "36028", "charges": 396.65, "gross": 396.65, "discount": -1942.84, "fuel": 98.42, "accessorial": 0, "weight": 358, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT MONTGOMERY, AL AND IS BEING SCHEDULED FOR DELIVERY.", "payment": "NotPaid"}, {"pro": "043984731", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-09", "delivery": "", "promised": "2026-03-17", "city": "DEMOTTE", "state": "IN", "zip": "46310", "charges": 332.93, "gross": 332.93, "discount": -1416.17, "fuel": 82.61, "accessorial": 0, "weight": 277, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT SOUTH CHICAGO, IL AND IS AWAITING DELIVERY.", "payment": "NotPaid"}, {"pro": "043984732", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-09", "delivery": "", "promised": "2026-03-13", "city": "PALMYRA", "state": "VA", "zip": "22963", "charges": 259.16, "gross": 259.16, "discount": -1484.99, "fuel": 64.3, "accessorial": 0, "weight": 416, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS OUT FOR DELIVERY AT WAYNESBORO, VA.", "payment": "NotPaid"}, {"pro": "043984733", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-09", "delivery": "2026-03-12", "promised": "2026-03-12", "city": "SOUDERTON", "state": "PA", "zip": "18964", "charges": 234.75, "gross": 234.75, "discount": -789.2, "fuel": 58.25, "accessorial": 0, "weight": 314, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/12/26 1218 (DEL SIG= robert mackey) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984768", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-11", "delivery": "", "promised": "2026-03-18", "city": "YOUNG HARRIS", "state": "GA", "zip": "30582", "charges": 432.21, "gross": 432.21, "discount": -911.65, "fuel": 106.71, "accessorial": 75.0, "weight": 318, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT LAWRENCEVILLE, GA AND IS AWAITING DELIVERY.", "payment": "NotPaid"}, {"pro": "043984769", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-13", "city": "ROARING SPRING", "state": "PA", "zip": "16673", "charges": 262.69, "gross": 262.69, "discount": -1434.79, "fuel": 65.18, "accessorial": 0, "weight": 414, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS OUT FOR DELIVERY AT ALTOONA, PA.", "payment": "NotPaid"}, {"pro": "043984770", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-16", "city": "DELAND", "state": "FL", "zip": "32724", "charges": 396.65, "gross": 396.65, "discount": -2243.35, "fuel": 98.42, "accessorial": 0, "weight": 345, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT ORLANDO, FL AND IS BEING SCHEDULED FOR DELIVERY.", "payment": "NotPaid"}, {"pro": "043984771", "status": "Delivered", "statusShort": "Delivered", "pickup": "2026-03-10", "delivery": "2026-03-13", "promised": "2026-03-13", "city": "BATH", "state": "PA", "zip": "18014", "charges": 234.75, "gross": 234.75, "discount": -767.7, "fuel": 58.25, "accessorial": 0, "weight": 289, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DELIVERED ON 03/13/26 0915 (DEL SIG= Flex Delivery) PER CONSIGNEE REQUEST.", "payment": "NotPaid"}, {"pro": "043984772", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-13", "city": "BRISTOL", "state": "WI", "zip": "53104", "charges": 332.93, "gross": 332.93, "discount": -2026.18, "fuel": 82.61, "accessorial": 0, "weight": 425, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT RACINE, WI AND IS AWAITING DELIVERY, PENDING APPOINTMENT.", "payment": "NotPaid"}, {"pro": "043984774", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-16", "city": "MAGNOLIA", "state": "TX", "zip": "77354", "charges": 482.02, "gross": 482.02, "discount": -3024.72, "fuel": 119.6, "accessorial": 0, "weight": 326, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DISPATCHED FROM LITTLE ROCK, AR TO HOUSTON, TX (WITH AN ETA OF 03/13 AT 14:46) LOADED TO HOUSTON, TX.", "payment": "NotPaid"}, {"pro": "043984775", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-19", "city": "ARCADIA", "state": "FL", "zip": "34266", "charges": 652.09, "gross": 652.09, "discount": -3025.08, "fuel": 119.62, "accessorial": 170.0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT ATLANTA, GA LOADED TO SARASOTA, FL AND IS READY FOR DISPATCH.", "payment": "NotPaid"}, {"pro": "043984776", "status": "OutForDelivery", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-13", "city": "CASTLETON", "state": "VA", "zip": "22716", "charges": 252.04, "gross": 252.04, "discount": -878.31, "fuel": 62.54, "accessorial": 0, "weight": 303, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS OUT FOR DELIVERY AT MANASSAS, VA.", "payment": "NotPaid"}, {"pro": "043984779", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-16", "city": "AUSTIN", "state": "AR", "zip": "72007", "charges": 409.64, "gross": 409.64, "discount": -1041.15, "fuel": 101.64, "accessorial": 0, "weight": 310, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT LITTLE ROCK, AR AND IS AWAITING DELIVERY, PENDING APPOINTMENT.", "payment": "NotPaid"}, {"pro": "043984780", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-16", "city": "LAKE HELEN", "state": "FL", "zip": "32744", "charges": 396.65, "gross": 396.65, "discount": -2260.08, "fuel": 98.42, "accessorial": 0, "weight": 358, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT ORLANDO, FL AND IS BEING SCHEDULED FOR DELIVERY.", "payment": "NotPaid"}, {"pro": "043984781", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-13", "city": "FOLEY", "state": "AL", "zip": "36535", "charges": 396.65, "gross": 396.65, "discount": -1824.64, "fuel": 98.42, "accessorial": 0, "weight": 337, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT ATLANTA, GA LOADED TO PENSACOLA, FL AND IS READY FOR DISPATCH.", "payment": "NotPaid"}, {"pro": "043984782", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-17", "city": "THOR", "state": "IA", "zip": "50591", "charges": 396.65, "gross": 396.65, "discount": -1942.13, "fuel": 98.42, "accessorial": 0, "weight": 304, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT KANSAS CITY, MO AND IS LOADING TO DES MOINES, IA.", "payment": "NotPaid"}, {"pro": "043984783", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-10", "delivery": "", "promised": "2026-03-16", "city": "GRAND RAPIDS", "state": "MI", "zip": "49534", "charges": 332.93, "gross": 332.93, "discount": -1560.92, "fuel": 82.61, "accessorial": 0, "weight": 358, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT GRAND RAPIDS, MI AND IS AWAITING DELIVERY.", "payment": "NotPaid"}, {"pro": "043984795", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-11", "delivery": "", "promised": "2026-03-16", "city": "LINESVILLE", "state": "PA", "zip": "16424", "charges": 296.78, "gross": 296.78, "discount": -1511.85, "fuel": 88.66, "accessorial": 0, "weight": 334, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DISPATCHED FROM NEW HAVEN, CT TO CARLISLE, PA (WITH AN ETA OF 03/13 AT 11:02) LOADED TO DAYTON, OH.", "payment": "NotPaid"}, {"pro": "043984797", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-11", "delivery": "", "promised": "2026-03-17", "city": "RICEVILLE", "state": "TN", "zip": "37370", "charges": 356.96, "gross": 356.96, "discount": -1475.98, "fuel": 106.64, "accessorial": 0, "weight": 306, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DISPATCHED FROM NEW HAVEN, CT TO CARLISLE, PA (WITH AN ETA OF 03/13 AT 11:02) LOADED TO DAYTON, OH.", "payment": "NotPaid"}, {"pro": "043984798", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-11", "delivery": "", "promised": "2026-03-16", "city": "ELM CITY", "state": "NC", "zip": "27822", "charges": 319.42, "gross": 319.42, "discount": -722.6, "fuel": 95.42, "accessorial": 0, "weight": 308, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT WINSTON-SALEM, NC.", "payment": "NotPaid"}, {"pro": "043984817", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-12", "delivery": "", "promised": "2026-03-17", "city": "REDFORD", "state": "MI", "zip": "48239", "charges": 316.19, "gross": 316.19, "discount": -1775.87, "fuel": 94.46, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT NEW HAVEN, CT AND IS LOADING TO CARLISLE, PA.", "payment": "NotPaid"}, {"pro": "043984818", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-12", "delivery": "", "promised": "2026-03-17", "city": "ROLLA", "state": "MO", "zip": "65401", "charges": 425.28, "gross": 425.28, "discount": -2400.65, "fuel": 127.05, "accessorial": 0, "weight": 413, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT WAS DISPATCHED FROM NEW HAVEN, CT TO CARLISLE, PA (WITH AN ETA OF 03/13 AT 11:02) LOADED TO DAYTON, OH.", "payment": "NotPaid"}, {"pro": "043984819", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-12", "delivery": "", "promised": "2026-03-19", "city": "CITRA", "state": "FL", "zip": "32113", "charges": 425.28, "gross": 425.28, "discount": -2320.01, "fuel": 127.05, "accessorial": 0, "weight": 365, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT NEW HAVEN, CT AND IS LOADING TO CARLISLE, PA.", "payment": "NotPaid"}, {"pro": "043984825", "status": "InTransit", "statusShort": "InTransit", "pickup": "2026-03-12", "delivery": "", "promised": "2026-03-18", "city": "KILGORE", "state": "TX", "zip": "75662", "charges": 497.77, "gross": 497.77, "discount": -2906.52, "fuel": 148.7, "accessorial": 0, "weight": 362, "packages": 1, "short": 0, "damaged": 0, "summary": "YOUR SHIPMENT IS AT NEW HAVEN, CT AND IS LOADING TO CARLISLE, PA.", "payment": "NotPaid"}];
+DATA.forEach(function(d) {
+  if (d.pickup && d.delivery) {
+    d.transitDays = Math.round((new Date(d.delivery) - new Date(d.pickup)) / 86400000);
+  } else { d.transitDays = null; }
+  if (d.delivery && d.promised) {
+    d.daysLate = Math.round((new Date(d.delivery) - new Date(d.promised)) / 86400000);
+  } else { d.daysLate = null; }
+  d.costPerLb = d.weight > 0 ? (d.charges / d.weight) : 0;
+});
+
+// ── ERROR DATA ──
+const ERR_BYTYPE = [{"code": "W-Warranty", "count": 23, "cost": 2643.3, "avg": 114.93, "pct": 43.4}, {"code": "A-Accommodation", "count": 19, "cost": 1240.44, "avg": 65.29, "pct": 35.8}, {"code": "D-Delivered Damaged", "count": 6, "cost": 195.99, "avg": 32.66, "pct": 11.3}, {"code": "P-Picking Error", "count": 3, "cost": 452.5, "avg": 150.83, "pct": 5.7}, {"code": "L-Lost Part", "count": 1, "cost": 275.0, "avg": 275.0, "pct": 1.9}, {"code": "V-Vendor Error", "count": 1, "cost": 29.0, "avg": 29.0, "pct": 1.9}];
+const ERR_TRENDS = [{"code": "A-Accommodation", "w0": 4, "w1": 3, "w2": 6, "w3": 6}, {"code": "D-Delivered Damaged", "w0": 2, "w1": 3, "w2": 0, "w3": 1}, {"code": "L-Lost Part", "w0": 0, "w1": 0, "w2": 1, "w3": 0}, {"code": "P-Picking Error", "w0": 0, "w1": 0, "w2": 1, "w3": 2}, {"code": "V-Vendor Error", "w0": 0, "w1": 0, "w2": 0, "w3": 1}, {"code": "W-Warranty", "w0": 4, "w1": 6, "w2": 6, "w3": 7}];
+const ERR_TOP10 = [{"rank": 1, "product": "06-03-1068 -- Z-10 Blower with BDL Liner and Frame Only", "code": "W-Warranty", "cost": 299.0, "so": "SO-001155823", "date": "02/19/2026"}, {"rank": 2, "product": "05-03-308 -- Large Bag w/Large Top Screen as Boxed", "code": "W-Warranty", "cost": 295.0, "so": "SO-001155725", "date": "02/17/2026"}, {"rank": 3, "product": "03-03-308 -- Commander Bag w/Large Top Screen as Boxed", "code": "L-Lost Part", "cost": 275.0, "so": "SO-001156707", "date": "03/02/2026"}, {"rank": 4, "product": "02-04-700A -- Aftmkt Lg Chassis", "code": "W-Warranty", "cost": 225.0, "so": "SO-001155832", "date": "02/19/2026"}, {"rank": 5, "product": "02-04-700A -- Aftmkt Lg Chassis", "code": "W-Warranty", "cost": 225.0, "so": "SO-001157481", "date": "03/09/2026"}, {"rank": 6, "product": "02-04-700A -- Aftmkt Lg Chassis", "code": "W-Warranty", "cost": 225.0, "so": "SO-001157505", "date": "03/09/2026"}, {"rank": 7, "product": "RPUR-08-07 -- URE hose 8in dia x 7ft", "code": "A-Accommodation", "cost": 200.0, "so": "SO-001155663", "date": "02/16/2026"}, {"rank": 8, "product": "RPUR-08-07 -- URE hose 8in dia x 7ft", "code": "W-Warranty", "cost": 200.0, "so": "SO-001156983", "date": "03/04/2026"}, {"rank": 9, "product": "02-03-023 -- Green XL/Z-10 5 Blade Fan with Hardware Kit", "code": "P-Picking Error", "cost": 199.0, "so": "SO-001157624", "date": "03/03/2026"}, {"rank": 10, "product": "02-03-023 -- Green XL/Z-10 5 Blade Fan with Hardware Kit", "code": "P-Picking Error", "cost": 199.0, "so": "SO-001157734", "date": "03/12/2026"}];
+const ERR_RCA = [{"id": "RCA-001", "pattern": "Warranty Pattern (20 products)", "type": "Warranty", "products": "01-01-1504, 01-01-1942, 01-01-826, 01-02-059, 01-02-077 (+15 more)", "count": 23, "risk": "HIGH", "notes": "23 total errors across 20 products, $2643 total cost"}, {"id": "RCA-002", "pattern": "Accommodation Pattern (19 products)", "type": "Accommodation", "products": "01-02-029, 01-02-2235, 01-02-632, 01-02-681, 01-03-1068 (+14 more)", "count": 19, "risk": "HIGH", "notes": "19 total errors across 19 products, $1240 total cost"}, {"id": "RCA-003", "pattern": "Repeat Warranty - 02-04-700A", "type": "Warranty", "products": "02-04-700A", "count": 3, "risk": "HIGH", "notes": "3 occurrences, $675 total cost across 3 orders"}, {"id": "RCA-004", "pattern": "Delivered Damaged Pattern (5 products)", "type": "Delivered Damaged", "products": "01-01-1856, 02-03-004, 14-02-008, 205, 221", "count": 6, "risk": "MEDIUM", "notes": "6 total errors across 5 products, $196 total cost"}, {"id": "RCA-005", "pattern": "Picking Error Pattern (2 products)", "type": "Picking Error", "products": "02-03-023, 208-090A", "count": 3, "risk": "MEDIUM", "notes": "3 total errors across 2 products, $452 total cost"}, {"id": "RCA-006", "pattern": "Repeat Delivered Damaged - 14-02-008", "type": "Delivered Damaged", "products": "14-02-008", "count": 2, "risk": "MEDIUM", "notes": "2 occurrences, $28 total cost across 2 orders"}, {"id": "RCA-007", "pattern": "Repeat Picking Error - 02-03-023", "type": "Picking Error", "products": "02-03-023", "count": 2, "risk": "MEDIUM", "notes": "2 occurrences, $398 total cost across 2 orders"}, {"id": "RCA-008", "pattern": "Repeat Warranty - 01-01-826", "type": "Warranty", "products": "01-01-826", "count": 2, "risk": "MEDIUM", "notes": "2 occurrences, $153 total cost across 2 orders"}];
+const ERR_CAPA = [{"id": "CAPA-001", "ref": "RCA-001", "action": "QC inspection protocol for 01-01-1504, 01-01-1942, 01-01-826, 01...", "owner": "Quality Assurance", "target": "2026-03-27", "status": "Planned", "priority": "HIGH"}, {"id": "CAPA-002", "ref": "RCA-002", "action": "Customer communication review for 01-02-029, 01-02-2235, 01-02-632, 01-...", "owner": "Customer Service", "target": "2026-03-27", "status": "Planned", "priority": "HIGH"}, {"id": "CAPA-003", "ref": "RCA-003", "action": "QC inspection protocol for 02-04-700A", "owner": "Quality Assurance", "target": "2026-03-27", "status": "Planned", "priority": "HIGH"}, {"id": "CAPA-004", "ref": "RCA-004", "action": "Packaging audit for 01-01-1856, 02-03-004, 14-02-008, 205...", "owner": "Logistics", "target": "2026-04-10", "status": "Planned", "priority": "MEDIUM"}, {"id": "CAPA-005", "ref": "RCA-005", "action": "Pick/pack process review for 02-03-023, 208-090A", "owner": "Warehouse", "target": "2026-04-10", "status": "Planned", "priority": "MEDIUM"}, {"id": "CAPA-006", "ref": "RCA-006", "action": "Packaging audit for 14-02-008", "owner": "Logistics", "target": "2026-04-10", "status": "Planned", "priority": "MEDIUM"}, {"id": "CAPA-007", "ref": "RCA-007", "action": "Pick/pack process review for 02-03-023", "owner": "Warehouse", "target": "2026-04-10", "status": "Planned", "priority": "MEDIUM"}, {"id": "CAPA-008", "ref": "RCA-008", "action": "QC inspection protocol for 01-01-826", "owner": "Quality Assurance", "target": "2026-04-10", "status": "Planned", "priority": "MEDIUM"}];
+const ERR_RAW = [{"so": "SO-001155663", "status": "Closed", "product": "RPUR-08-07 -- URE hose 8in dia x 7ft", "ship": "Shipping@CLS", "cost": 200.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/16/2026", "match": ""}, {"so": "SO-001155663", "status": "Closed", "product": "05-02-080 -- XL MDA Collar Comp w/Band Clamp", "ship": "Shipping@Combined", "cost": 57.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/16/2026", "match": ""}, {"so": "SO-001155695", "status": "Closed", "product": "01-03-1068 -- 8\" Blower with BDL Liner and Frame Only", "ship": "Shipping@WPP", "cost": 74.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/16/2026", "match": ""}, {"so": "SO-001155857", "status": "Closed", "product": "05-02-143 -- XL MDA Standard w/Strikes", "ship": "Shipping@Combined", "cost": 95.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/20/2026", "match": ""}, {"so": "SO-001155968", "status": "Closed", "product": "01-02-632 -- Skin Board Complete for 035 MDA", "ship": "Shipping@WPP", "cost": 49.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/24/2026", "match": ""}, {"so": "SO-001156021", "status": "Closed", "product": "01-04-020 -- Std Boot Plate Box, Complete", "ship": "Shipping@Combined", "cost": 45.9, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/25/2026", "match": ""}, {"so": "SO-001156327", "status": "Closed", "product": "02-03-021 -- XR &VG12 Orange 5 Blade Fan with Hardware Kit", "ship": "Shipping@Combined", "cost": 169.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "02/27/2026", "match": ""}, {"so": "SO-001156682", "status": "Closed", "product": "RPUR-10-05 -- URE hose 10in dia x 5ft", "ship": "Shipping@CLS", "cost": 28.35, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/02/2026", "match": ""}, {"so": "SO-001156730", "status": "Closed", "product": "01-04-1040 -- 8\" Blower Rebuild XR950 and VG12 5 blade", "ship": "Shipping@WPP", "cost": 72.19, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/02/2026", "match": ""}, {"so": "SO-001156740", "status": "Closed", "product": "01-02-029 -- Tab Bracket, Jack Stand", "ship": "Shipping@Combined", "cost": 26.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/02/2026", "match": ""}, {"so": "SO-001156744", "status": "Open", "product": "221 -- Roof Rack Carrier- Comm PRO, XL & Z10", "ship": "Shipping@WPP", "cost": 50.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/02/2026", "match": ""}, {"so": "SO-001157047", "status": "Closed", "product": "01-02-2235 -- Power lifter Bracket New", "ship": "Shipping@Combined", "cost": 5.0, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/04/2026", "match": ""}, {"so": "SO-001157129", "status": "Closed", "product": "01-04-153 -- Black Cloth Repair Kit Complete", "ship": "Shipping@Combined", "cost": 42.5, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/06/2026", "match": ""}, {"so": "SO-001157446", "status": "Closed", "product": "208DA -- Hitch-D", "ship": "Shipping@WPP", "cost": 97.5, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/09/2026", "match": ""}, {"so": "SO-001157493", "status": "Closed", "product": "05-02-003 -- Motor frame w/plugs", "ship": "Shipping@Combined", "cost": 49.5, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/09/2026", "match": ""}, {"so": "SO-001157584", "status": "Closed", "product": "208TA -- Hitch-3pt", "ship": "Shipping@Combined", "cost": 40.5, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/10/2026", "match": ""}, {"so": "SO-001157614", "status": "Closed", "product": "01-02-681 -- 2 Motor Clamp Knob Complete w/washers", "ship": "Shipping@Combined", "cost": 19.9, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/10/2026", "match": ""}, {"so": "SO-001157691", "status": "Closed", "product": "05-03-308 -- Large Bag w/Large Top Screen as Boxed", "ship": "Shipping@CLS", "cost": 44.25, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/11/2026", "match": ""}, {"so": "SO-001157739", "status": "Open", "product": "256 -- Estate Vac (Urethane) - Z-10", "ship": "Shipping@CLS", "cost": 74.85, "csr": "Customer Service", "code": "A-Accommodation", "date": "03/12/2026", "match": ""}, {"so": "SO-001155735", "status": "Closed", "product": "14-02-008 -- CRS Hose Hanger Mount and Hardware", "ship": "Shipping@Combined", "cost": 0.0, "csr": "Eileen Piotrkowski", "code": "D-Delivered Damaged", "date": "02/17/2026", "match": ""}, {"so": "SO-001155745", "status": "Closed", "product": "14-02-008 -- CRS Hose Hanger Mount and Hardware", "ship": "Shipping@Combined", "cost": 27.99, "csr": "Customer Service", "code": "D-Delivered Damaged", "date": "02/18/2026", "match": ""}, {"so": "SO-001155924", "status": "Closed", "product": "205 -- Wall Mount Kit", "ship": "Shipping@Combined", "cost": 49.0, "csr": "Customer Service", "code": "D-Delivered Damaged", "date": "02/23/2026", "match": ""}, {"so": "SO-001155953", "status": "Closed", "product": "02-03-004 -- Top Brace Assy Complete- Comm PRO, XL & Z10", "ship": "Shipping@Combined", "cost": 42.5, "csr": "Customer Service", "code": "D-Delivered Damaged", "date": "02/24/2026", "match": ""}, {"so": "SO-001156245", "status": "Closed", "product": "221 -- Roof Rack Carrier- Comm PRO, XL & Z10", "ship": "Shipping@WPP", "cost": 69.0, "csr": "Customer Service", "code": "D-Delivered Damaged", "date": "02/27/2026", "match": ""}, {"so": "SO-001157659", "status": "Closed", "product": "01-01-1856 -- Molded Dump Link Slider", "ship": "Shipping@Combined", "cost": 7.5, "csr": "Customer Service", "code": "D-Delivered Damaged", "date": "03/11/2026", "match": ""}, {"so": "SO-001156707", "status": "Closed", "product": "03-03-308 -- Commander Bag w/Large Top Screen as Boxed", "ship": "Shipping@CLS", "cost": 275.0, "csr": "Customer Service", "code": "L-Lost Part", "date": "03/02/2026", "match": ""}, {"so": "SO-001157624", "status": "Closed", "product": "02-03-023 -- Green XL/Z-10 5 Blade Fan with Hardware Kit", "ship": "Shipping@Combined", "cost": 199.0, "csr": "Customer Service", "code": "P-Picking Error", "date": "03/03/2026", "match": ""}, {"so": "SO-001157477", "status": "Closed", "product": "208-090A -- Hitch 90 degree", "ship": "Shipping@Combined", "cost": 54.5, "csr": "Customer Service", "code": "P-Picking Error", "date": "03/09/2026", "match": ""}, {"so": "SO-001157734", "status": "Open", "product": "02-03-023 -- Green XL/Z-10 5 Blade Fan with Hardware Kit", "ship": "Shipping@Combined", "cost": 199.0, "csr": "Customer Service", "code": "P-Picking Error", "date": "03/12/2026", "match": ""}, {"so": "SO-001157467", "status": "Closed", "product": "01-02-028 -- Mount Tube, Jack Stand", "ship": "Shipping@Combined", "cost": 29.0, "csr": "Customer Service", "code": "V-Vendor Error", "date": "03/09/2026", "match": ""}, {"so": "SO-001155725", "status": "Closed", "product": "05-03-308 -- Large Bag w/Large Top Screen as Boxed", "ship": "Shipping@CLS", "cost": 295.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/17/2026", "match": ""}, {"so": "SO-001155823", "status": "Closed", "product": "06-03-1068 -- Z-10 Blower with BDL Liner and Frame Only", "ship": "Shipping@WPP", "cost": 299.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/19/2026", "match": ""}, {"so": "SO-001155832", "status": "Closed", "product": "02-04-700A -- Aftmkt Lg Chassis", "ship": "Shipping@CLS", "cost": 225.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/19/2026", "match": ""}, {"so": "SO-001155878", "status": "Closed", "product": "01-03-540 -- Switch Panel Assy Cyclone Master", "ship": "Shipping@Combined", "cost": 139.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/20/2026", "match": ""}, {"so": "SO-001155920", "status": "Closed", "product": "01-04-153 -- Black Cloth Repair Kit Complete", "ship": "Shipping@Combined", "cost": 42.5, "csr": "Customer Service", "code": "W-Warranty", "date": "02/23/2026", "match": ""}, {"so": "SO-001155931", "status": "Closed", "product": "01-02-1145 -- Kubota Boot JP w/Strikes", "ship": "Shipping@Combined", "cost": 95.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/23/2026", "match": ""}, {"so": "SO-001156008", "status": "Closed", "product": "01-01-1504 -- Charger, Power Lifter", "ship": "Shipping@Combined", "cost": 55.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/25/2026", "match": ""}, {"so": "SO-001156125", "status": "Closed", "product": "01-01-1942 -- Battery Harness Electric Start", "ship": "Shipping@Combined", "cost": 32.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/26/2026", "match": ""}, {"so": "SO-001156305", "status": "Closed", "product": "01-01-826 -- Tire & wheel assembly (single and dual)", "ship": "Shipping@Combined", "cost": 102.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/27/2026", "match": ""}, {"so": "SO-001156327", "status": "Closed", "product": "01-02-077 -- Exit Chute complete- classic & commander 8\" (Green)", "ship": "Shipping@Combined", "cost": 110.0, "csr": "Customer Service", "code": "W-Warranty", "date": "02/27/2026", "match": ""}, {"so": "SO-001156705", "status": "Closed", "product": "01-01-826 -- Tire & wheel assembly (single and dual)", "ship": "Shipping@Combined", "cost": 51.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/02/2026", "match": ""}, {"so": "SO-001156732", "status": "Closed", "product": "01-02-059 -- 8x8 Coupling Complete", "ship": "Shipping@Combined", "cost": 65.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/02/2026", "match": ""}, {"so": "SO-001156983", "status": "Closed", "product": "RPUR-08-07 -- URE hose 8in dia x 7ft", "ship": "Shipping@CLS", "cost": 200.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/04/2026", "match": ""}, {"so": "SO-001157084", "status": "Closed", "product": "05-01-2225 -- Lithium Battery Electric Start", "ship": "Shipping@Combined", "cost": 89.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/05/2026", "match": ""}, {"so": "SO-001157117", "status": "Closed", "product": "01-02-120 -- 2 Top Brace brackets and 2 RRC clamp knobs", "ship": "Shipping@Combined", "cost": 14.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/06/2026", "match": ""}, {"so": "SO-001157128", "status": "Closed", "product": "208-011A -- Hitch Grasshopper 200", "ship": "Shipping@Combined", "cost": 97.5, "csr": "Customer Service", "code": "W-Warranty", "date": "03/06/2026", "match": ""}, {"so": "SO-001157481", "status": "Closed", "product": "02-04-700A -- Aftmkt Lg Chassis", "ship": "Shipping@CLS", "cost": 225.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/09/2026", "match": ""}, {"so": "SO-001157505", "status": "Closed", "product": "02-04-700A -- Aftmkt Lg Chassis", "ship": "Shipping@CLS", "cost": 225.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/09/2026", "match": ""}, {"so": "SO-001157514", "status": "Closed", "product": "05-03-1201 -- L-Ion Battery Pack retrofi", "ship": "Shipping@Combined", "cost": 150.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/09/2026", "match": ""}, {"so": "SO-001157579", "status": "Closed", "product": "01-03-045 -- 2 Latches with Screws and T Nuts", "ship": "Shipping@Combined", "cost": 19.9, "csr": "Customer Service", "code": "W-Warranty", "date": "03/10/2026", "match": ""}, {"so": "SO-001157648", "status": "Closed", "product": "01-02-126 -- Caster wheel for motor frame nut & washer", "ship": "Shipping@Combined", "cost": 27.5, "csr": "Customer Service", "code": "W-Warranty", "date": "03/11/2026", "match": ""}, {"so": "SO-001157677", "status": "Closed", "product": "01-02-681 -- 2 Motor Clamp Knob Complete w/washers", "ship": "Shipping@Combined", "cost": 19.9, "csr": "Customer Service", "code": "W-Warranty", "date": "03/11/2026", "match": ""}, {"so": "SO-001157700", "status": "Open", "product": "02-03-2195 -- CRC 3pc Side Tube as Boxed", "ship": "Shipping@CLS", "cost": 65.0, "csr": "Customer Service", "code": "W-Warranty", "date": "03/11/2026", "match": ""}];
+const ERR_WATCH = [{"product": "02-04-700A -- Aftmkt Lg Chassis", "code": "W-Warranty", "current": 3, "historical": 3, "trend": "WATCH", "alert": "HIGH"}, {"product": "RPUR-08-07 -- URE hose 8in dia x 7ft", "code": "W-Warranty", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "221 -- Roof Rack Carrier- Comm PRO, XL & Z10", "code": "D-Delivered Damaged", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "01-04-153 -- Black Cloth Repair Kit Complete", "code": "W-Warranty", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "01-02-681 -- 2 Motor Clamp Knob Complete w/washers", "code": "W-Warranty", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "05-03-308 -- Large Bag w/Large Top Screen as Boxed", "code": "W-Warranty", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "14-02-008 -- CRS Hose Hanger Mount and Hardware", "code": "D-Delivered Damaged", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "02-03-023 -- Green XL/Z-10 5 Blade Fan with Hardware Kit", "code": "P-Picking Error", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}, {"product": "01-01-826 -- Tire & wheel assembly (single and dual)", "code": "W-Warranty", "current": 2, "historical": 2, "trend": "WATCH", "alert": "MEDIUM"}];
+
+// ══════════════════════════════════════
+// TAB 1: LTL SHIPPING
+// ══════════════════════════════════════
+var delivered = DATA.filter(function(d) { return d.status === "Delivered"; });
+var onTime = delivered.filter(function(d) { return d.daysLate !== null && d.daysLate <= 0; });
+var totalCharges = DATA.reduce(function(s, d) { return s + d.charges; }, 0);
+var avgCost = totalCharges / DATA.length;
+var avgTransit = delivered.reduce(function(s, d) { return s + (d.transitDays || 0); }, 0) / delivered.length;
+var totalWeight = DATA.reduce(function(s, d) { return s + d.weight; }, 0);
+
+var kpis = [
+  { value: DATA.length, label: "Total Shipments", sub: "Feb 3 - Mar 11, 2026", cls: "" },
+  { value: delivered.length, label: "Delivered", sub: (delivered.length / DATA.length * 100).toFixed(1) + "% of total", cls: "green" },
+  { value: (DATA.length - delivered.length), label: "In Transit", sub: "Pending delivery", cls: "blue" },
+  { value: (onTime.length / delivered.length * 100).toFixed(1) + "%", label: "On-Time Rate", sub: onTime.length + " of " + delivered.length + " on time", cls: "green" },
+  { value: "$" + totalCharges.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}), label: "Total Freight Spend", sub: "", cls: "" },
+  { value: "$" + avgCost.toFixed(2), label: "Avg Cost/Shipment", sub: "", cls: "" },
+  { value: avgTransit.toFixed(1) + " days", label: "Avg Transit Time", sub: "", cls: "" },
+  { value: totalWeight.toLocaleString() + " lbs", label: "Total Weight Shipped", sub: "Avg: " + Math.round(totalWeight/DATA.length) + " lbs/shipment", cls: "" }
+];
+var kpiRow = document.getElementById("kpiRow");
+kpis.forEach(function(k) {
+  var div = document.createElement("div");
+  div.className = "kpi-card " + k.cls;
+  div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>';
+  kpiRow.appendChild(div);
+});
+
+// Status doughnut
+var statusCounts = {};
+DATA.forEach(function(d) { statusCounts[d.statusShort] = (statusCounts[d.statusShort] || 0) + 1; });
+new Chart(document.getElementById("statusChart"), {
+  type: "doughnut",
+  data: { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: ["#2d6a4f","#e9c46a","#e76f51"], borderWidth: 2 }] },
+  options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+});
+
+// Weekly bar + line
+var weeks = {};
+DATA.forEach(function(d) {
+  if (!d.pickup) return;
+  var dt = new Date(d.pickup);
+  var ws = new Date(dt);
+  ws.setDate(dt.getDate() - dt.getDay() + 1);
+  var key = ws.toISOString().slice(0, 10);
+  if (!weeks[key]) weeks[key] = { count: 0, cost: 0 };
+  weeks[key].count++;
+  weeks[key].cost += d.charges;
+});
+var weekKeys = Object.keys(weeks).sort();
+var weekLabels = weekKeys.map(function(k) {
+  var d = new Date(k);
+  return "Wk " + d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+});
+new Chart(document.getElementById("weeklyChart"), {
+  type: "bar",
+  data: {
+    labels: weekLabels,
+    datasets: [
+      { label: "Shipments", data: weekKeys.map(function(k) { return weeks[k].count; }), backgroundColor: "#1B3A4B", yAxisID: "y" },
+      { label: "Total Cost ($)", data: weekKeys.map(function(k) { return weeks[k].cost.toFixed(2); }), type: "line", borderColor: "#e9c46a", backgroundColor: "#e9c46a", yAxisID: "y1", tension: 0.3, pointRadius: 5 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, title: { display: true, text: "Shipments" } },
+      y1: { position: "right", beginAtZero: true, title: { display: true, text: "Cost ($)" }, grid: { drawOnChartArea: false } }
+    },
+    plugins: { legend: { position: "bottom" } }
+  }
+});
+
+// Cost pie
+var totalFuel = DATA.reduce(function(s, d) { return s + d.fuel; }, 0);
+var totalAccessorial = DATA.reduce(function(s, d) { return s + d.accessorial; }, 0);
+var baseFreight = totalCharges - totalFuel - totalAccessorial;
+new Chart(document.getElementById("costChart"), {
+  type: "pie",
+  data: {
+    labels: ["Base Freight ($" + baseFreight.toFixed(0) + ")", "Fuel Surcharge ($" + totalFuel.toFixed(0) + ")", "Accessorial ($" + totalAccessorial.toFixed(0) + ")"],
+    datasets: [{ data: [baseFreight, totalFuel, totalAccessorial], backgroundColor: ["#1B3A4B","#e9c46a","#e76f51"] }]
+  },
+  options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+});
+
+// Transit histogram
+var transitBuckets = {"2-4": 0, "5-6": 0, "7": 0, "8-9": 0, "10-14": 0};
+delivered.forEach(function(d) {
+  if (d.transitDays <= 4) transitBuckets["2-4"]++;
+  else if (d.transitDays <= 6) transitBuckets["5-6"]++;
+  else if (d.transitDays === 7) transitBuckets["7"]++;
+  else if (d.transitDays <= 9) transitBuckets["8-9"]++;
+  else transitBuckets["10-14"]++;
+});
+new Chart(document.getElementById("transitChart"), {
+  type: "bar",
+  data: {
+    labels: Object.keys(transitBuckets).map(function(k) { return k + " days"; }),
+    datasets: [{ label: "Shipments", data: Object.values(transitBuckets), backgroundColor: ["#264653","#2a9d8f","#2d6a4f","#e9c46a","#e76f51"] }]
+  },
+  options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+});
+
+// State bar
+var stateCounts = {};
+DATA.forEach(function(d) { if (d.state) stateCounts[d.state] = (stateCounts[d.state] || 0) + 1; });
+var sortedStates = Object.entries(stateCounts).sort(function(a, b) { return b[1] - a[1]; });
+new Chart(document.getElementById("stateChart"), {
+  type: "bar",
+  data: {
+    labels: sortedStates.map(function(s) { return s[0]; }),
+    datasets: [{ label: "Shipments", data: sortedStates.map(function(s) { return s[1]; }), backgroundColor: "#2d6a4f" }]
+  },
+  options: { indexAxis: "y", responsive: true, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+});
+
+// Cost scatter
+var costTimeData = DATA.filter(function(d) { return d.pickup; }).map(function(d) { return { x: d.pickup, y: d.charges, pro: d.pro }; });
+new Chart(document.getElementById("costTimeChart"), {
+  type: "scatter",
+  data: { datasets: [{ label: "Cost per Shipment", data: costTimeData, backgroundColor: "#1B3A4B", pointRadius: 6, pointHoverRadius: 9 }] },
+  options: {
+    responsive: true,
+    scales: {
+      x: { type: "time", time: { unit: "day", displayFormats: { day: "MMM d" } }, title: { display: true, text: "Pickup Date" } },
+      y: { beginAtZero: false, title: { display: true, text: "Charges ($)" } }
+    },
+    plugins: { tooltip: { callbacks: { label: function(ctx) { return "PRO " + ctx.raw.pro + ": $" + ctx.raw.y.toFixed(2); } } }, legend: { display: false } }
+  }
+});
+
+// LTL Table
+function renderTable(filteredData) {
+  var tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+  filteredData.forEach(function(d) {
+    var tr = document.createElement("tr");
+    if (d.daysLate > 0) tr.className = "late";
+    else if (d.status === "Delivered") tr.className = "delivered";
+    else tr.className = "intransit";
+    var onTimeStr = d.daysLate !== null ? (d.daysLate <= 0 ? "Yes" : d.daysLate + " days late") : "-";
+    var sc = d.status === "Delivered" ? "status-delivered" : (d.statusShort === "OutForDelivery" ? "status-out" : "status-intransit");
+    tr.innerHTML = "<td>" + d.pro + "</td>" +
+      '<td><span class="status-badge ' + sc + '">' + d.status + '</span></td>' +
+      "<td>" + d.pickup + "</td><td>" + d.promised + "</td>" +
+      "<td>" + (d.delivery || "-") + "</td>" +
+      "<td>" + (d.transitDays !== null ? d.transitDays : "-") + "</td>" +
+      "<td>" + onTimeStr + "</td>" +
+      "<td>" + d.city + "</td><td>" + d.state + "</td>" +
+      "<td>$" + d.charges.toFixed(2) + "</td>" +
+      "<td>" + d.weight + "</td>" +
+      "<td>$" + d.costPerLb.toFixed(2) + "</td>" +
+      "<td>" + d.payment + "</td>";
+    tbody.appendChild(tr);
+  });
+}
+
+var statusSelect = document.getElementById("filterStatus");
+var stateSelect = document.getElementById("filterState");
+var searchInput = document.getElementById("filterSearch");
+var statuses = [];
+DATA.forEach(function(d) { if (statuses.indexOf(d.statusShort) === -1) statuses.push(d.statusShort); });
+statuses.forEach(function(s) { var o = document.createElement("option"); o.value = s; o.textContent = s; statusSelect.appendChild(o); });
+var statesList = [];
+DATA.forEach(function(d) { if (statesList.indexOf(d.state) === -1) statesList.push(d.state); });
+statesList.sort();
+statesList.forEach(function(s) { var o = document.createElement("option"); o.value = s; o.textContent = s; stateSelect.appendChild(o); });
+
+function applyFilters() {
+  var filtered = DATA.slice();
+  var sv = statusSelect.value;
+  var stv = stateSelect.value;
+  var search = searchInput.value.toLowerCase();
+  if (sv !== "all") filtered = filtered.filter(function(d) { return d.statusShort === sv; });
+  if (stv !== "all") filtered = filtered.filter(function(d) { return d.state === stv; });
+  if (search) filtered = filtered.filter(function(d) { return d.pro.indexOf(search) !== -1 || d.city.toLowerCase().indexOf(search) !== -1; });
+  renderTable(filtered);
+}
+statusSelect.addEventListener("change", applyFilters);
+stateSelect.addEventListener("change", applyFilters);
+searchInput.addEventListener("input", applyFilters);
+
+var sortCol = -1, sortAsc = true;
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  var keys = ["pro","status","pickup","promised","delivery","transitDays","daysLate","city","state","charges","weight","costPerLb","payment"];
+  DATA.sort(function(a, b) {
+    var va = a[keys[col]], vb = b[keys[col]];
+    if (va === null || va === undefined) va = "";
+    if (vb === null || vb === undefined) vb = "";
+    if (typeof va === "number") return sortAsc ? va - vb : vb - va;
+    return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+  applyFilters();
+}
+renderTable(DATA);
+
+// ══════════════════════════════════════
+// TAB 2: ERRORS & QUALITY
+// ══════════════════════════════════════
+
+// Error KPIs
+var totalErrors = ERR_RAW.length;
+var totalErrCost = ERR_RAW.reduce(function(s,d) { return s + d.cost; }, 0);
+var topType = ERR_BYTYPE.reduce(function(a,b) { return a.count > b.count ? a : b; });
+var openErrors = ERR_RAW.filter(function(d) { return d.status === "Open"; }).length;
+var closedErrors = ERR_RAW.filter(function(d) { return d.status === "Closed"; }).length;
+var avgErrCost = totalErrCost / totalErrors;
+var capaInProg = ERR_CAPA.filter(function(d) { return d.status === "In Progress"; }).length;
+var capaPlanned = ERR_CAPA.filter(function(d) { return d.status === "Planned"; }).length;
+
+var errKpis = [
+  { value: totalErrors, label: "Total Errors", sub: "Since Feb 15, 2026", cls: "red" },
+  { value: "$" + totalErrCost.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2}), label: "Total Error Cost", sub: "Avg: $" + avgErrCost.toFixed(2), cls: "red" },
+  { value: topType.code, label: "Top Error Type", sub: topType.count + " occurrences (" + topType.pct.toFixed(0) + "%)", cls: "orange" },
+  { value: openErrors, label: "Open Errors", sub: closedErrors + " closed", cls: "blue" },
+  { value: ERR_BYTYPE.length, label: "Reason Codes", sub: "4 categories tracked", cls: "" },
+  { value: ERR_RCA.length, label: "Root Causes Identified", sub: ERR_RCA.filter(function(d){return d.risk==="HIGH"}).length + " HIGH risk", cls: "red" },
+  { value: ERR_CAPA.length, label: "CAPA Actions", sub: capaInProg + " in progress, " + capaPlanned + " planned", cls: "green" },
+  { value: ERR_WATCH.length, label: "Products on Watch", sub: "Repeat offenders", cls: "orange" }
+];
+var errKpiRow = document.getElementById("errKpiRow");
+errKpis.forEach(function(k) {
+  var div = document.createElement("div");
+  div.className = "kpi-card " + k.cls;
+  div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>';
+  errKpiRow.appendChild(div);
+});
+
+// Error Type Doughnut
+var errTypeColors = ["#e76f51","#e9c46a","#264653","#2a9d8f"];
+new Chart(document.getElementById("errTypeChart"), {
+  type: "doughnut",
+  data: {
+    labels: ERR_BYTYPE.map(function(d) { return d.code + " (" + d.count + ")"; }),
+    datasets: [{ data: ERR_BYTYPE.map(function(d) { return d.count; }), backgroundColor: errTypeColors, borderWidth: 2 }]
+  },
+  options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+});
+
+// Weekly Trends Stacked Bar
+var trendColors = {"A-Accommodation":"#e76f51","D-Delivered Damaged":"#e9c46a","L-Lost Part":"#264653","W-Warranty":"#2a9d8f"};
+var trendWeeks = ["Week 8", "Week 9", "Week 10", "Week 11"];
+var trendDatasets = ERR_TRENDS.map(function(t) {
+  return {
+    label: t.code,
+    data: (function(){ var d=[]; for(var i=0;i<4;i++) d.push(t["w"+i]||0); return d; })(),
+    backgroundColor: trendColors[t.code] || "#999"
+  };
+});
+new Chart(document.getElementById("errTrendChart"), {
+  type: "bar",
+  data: { labels: trendWeeks, datasets: trendDatasets },
+  options: {
+    responsive: true,
+    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: "Error Count" } } },
+    plugins: { legend: { position: "bottom" } }
+  }
+});
+
+// Error Cost by Type (pie)
+new Chart(document.getElementById("errCostChart"), {
+  type: "pie",
+  data: {
+    labels: ERR_BYTYPE.map(function(d) { return d.code + " ($" + d.cost.toFixed(0) + ")"; }),
+    datasets: [{ data: ERR_BYTYPE.map(function(d) { return d.cost; }), backgroundColor: errTypeColors }]
+  },
+  options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+});
+
+// Top 10 Horizontal Bar
+new Chart(document.getElementById("errTop10Chart"), {
+  type: "bar",
+  data: {
+    labels: ERR_TOP10.map(function(d) { return d.product.length > 40 ? d.product.substring(0,40) + "..." : d.product; }),
+    datasets: [{ label: "Cost ($)", data: ERR_TOP10.map(function(d) { return d.cost; }), backgroundColor: ERR_TOP10.map(function(d) { return trendColors[d.code] || "#1B3A4B"; }) }]
+  },
+  options: {
+    indexAxis: "y",
+    responsive: true,
+    scales: { x: { beginAtZero: true, title: { display: true, text: "Cost ($)" } } },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { var d = ERR_TOP10[ctx.dataIndex]; return d.code + " | $" + d.cost + " | " + d.so; } } } }
+  }
+});
+
+// RCA Table
+var rcaBody = document.getElementById("rcaBody");
+ERR_RCA.forEach(function(d) {
+  var tr = document.createElement("tr");
+  var riskCls = d.risk === "HIGH" ? "risk-high" : (d.risk === "MEDIUM" ? "risk-medium" : "risk-low");
+  tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.pattern + "</td><td>" + d.type + "</td><td>" + d.products + "</td><td>" + d.count + "</td><td><span class='" + riskCls + "'>" + d.risk + "</span></td><td>" + d.notes + "</td>";
+  rcaBody.appendChild(tr);
+});
+
+// CAPA Table
+var capaBody = document.getElementById("capaBody");
+ERR_CAPA.forEach(function(d) {
+  var tr = document.createElement("tr");
+  var prCls = d.priority === "HIGH" ? "priority-high" : (d.priority === "MEDIUM" ? "priority-medium" : "priority-low");
+  var stCls = d.status === "In Progress" ? "status-in-progress" : "status-planned";
+  tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.ref + "</td><td>" + d.action + "</td><td>" + d.owner + "</td><td>" + d.target + "</td><td><span class='" + stCls + "'>" + d.status + "</span></td><td><span class='" + prCls + "'>" + d.priority + "</span></td>";
+  capaBody.appendChild(tr);
+});
+
+// Watch List Table
+var watchBody = document.getElementById("watchBody");
+ERR_WATCH.forEach(function(d) {
+  var tr = document.createElement("tr");
+  var alertCls = d.alert === "HIGH" ? "risk-high" : (d.alert === "MEDIUM" ? "risk-medium" : "risk-low");
+  var trendIcon = d.trend === "DOWN" ? "&#9660; " : (d.trend === "UP" ? "&#9650; " : "&#9654; ");
+  var trendColor = d.trend === "DOWN" ? "color:#2d6a4f" : (d.trend === "UP" ? "color:#c0392b" : "");
+  tr.innerHTML = "<td>" + d.product + "</td><td>" + d.code + "</td><td>" + d.current + "</td><td>" + d.historical + "</td><td><span style='" + trendColor + "'>" + trendIcon + d.trend + "</span></td><td><span class='" + alertCls + "'>" + d.alert + "</span></td>";
+  watchBody.appendChild(tr);
+});
+
+// Error Detail Table
+function renderErrTable(filteredData) {
+  var tbody = document.getElementById("errTableBody");
+  tbody.innerHTML = "";
+  filteredData.forEach(function(d) {
+    var tr = document.createElement("tr");
+    var codeCls = "";
+    if (d.code.startsWith("W-")) codeCls = "style='color:#2a9d8f;font-weight:600'";
+    else if (d.code.startsWith("A-")) codeCls = "style='color:#e76f51;font-weight:600'";
+    else if (d.code.startsWith("D-")) codeCls = "style='color:#e9c46a;font-weight:600'";
+    else if (d.code.startsWith("L-")) codeCls = "style='color:#264653;font-weight:600'";
+    tr.innerHTML = "<td>" + d.so + "</td><td>" + d.status + "</td><td>" + d.product + "</td><td>" + d.ship + "</td><td>$" + d.cost.toFixed(2) + "</td><td>" + d.csr + "</td><td " + codeCls + ">" + d.code + "</td><td>" + d.date + "</td><td>" + d.match + "</td>";
+    tbody.appendChild(tr);
+  });
+}
+
+var errCodeSelect = document.getElementById("errFilterCode");
+var errStatusSelect = document.getElementById("errFilterStatus");
+var errSearchInput = document.getElementById("errFilterSearch");
+
+var errCodes = [];
+ERR_RAW.forEach(function(d) { if (errCodes.indexOf(d.code) === -1) errCodes.push(d.code); });
+errCodes.sort();
+errCodes.forEach(function(s) { var o = document.createElement("option"); o.value = s; o.textContent = s; errCodeSelect.appendChild(o); });
+
+var errStatuses = [];
+ERR_RAW.forEach(function(d) { if (errStatuses.indexOf(d.status) === -1) errStatuses.push(d.status); });
+errStatuses.forEach(function(s) { var o = document.createElement("option"); o.value = s; o.textContent = s; errStatusSelect.appendChild(o); });
+
+function applyErrFilters() {
+  var filtered = ERR_RAW.slice();
+  var cv = errCodeSelect.value;
+  var sv = errStatusSelect.value;
+  var search = errSearchInput.value.toLowerCase();
+  if (cv !== "all") filtered = filtered.filter(function(d) { return d.code === cv; });
+  if (sv !== "all") filtered = filtered.filter(function(d) { return d.status === sv; });
+  if (search) filtered = filtered.filter(function(d) { return d.product.toLowerCase().indexOf(search) !== -1 || d.so.toLowerCase().indexOf(search) !== -1; });
+  renderErrTable(filtered);
+}
+errCodeSelect.addEventListener("change", applyErrFilters);
+errStatusSelect.addEventListener("change", applyErrFilters);
+errSearchInput.addEventListener("input", applyErrFilters);
+
+var errSortCol = -1, errSortAsc = true;
+function sortErrTable(col) {
+  if (errSortCol === col) errSortAsc = !errSortAsc;
+  else { errSortCol = col; errSortAsc = true; }
+  var keys = ["so","status","product","ship","cost","csr","code","date","match"];
+  ERR_RAW.sort(function(a, b) {
+    var va = a[keys[col]], vb = b[keys[col]];
+    if (va === null || va === undefined) va = "";
+    if (vb === null || vb === undefined) vb = "";
+    if (typeof va === "number") return errSortAsc ? va - vb : vb - va;
+    return errSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+  applyErrFilters();
+}
+renderErrTable(ERR_RAW);
+
+</script>
+</body>
+</html>
