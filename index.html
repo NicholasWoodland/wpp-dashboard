@@ -317,11 +317,12 @@ delivered.forEach(function(d) {
   else if (d.transitDays <= 9) transitBuckets["8-9"]++;
   else transitBuckets["10+"]++;
 });
+var transitOrder = ["1-4","5-6","7","8-9","10+"];
 new Chart(document.getElementById("transitChart"), {
   type: "bar",
   data: {
-    labels: Object.keys(transitBuckets).map(function(k) { return k + " days"; }),
-    datasets: [{ label: "Shipments", data: Object.values(transitBuckets), backgroundColor: ["#00502f","#77af96","#ffc425","#ffd576","#f18f1c"] }]
+    labels: transitOrder.map(function(k) { return k + " days"; }),
+    datasets: [{ label: "Shipments", data: transitOrder.map(function(k) { return transitBuckets[k]; }), backgroundColor: ["#00502f","#77af96","#ffc425","#ffd576","#f18f1c"] }]
   },
   options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
 });
