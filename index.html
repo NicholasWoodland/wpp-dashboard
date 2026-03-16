@@ -542,7 +542,7 @@ errKpis.forEach(function(k) {
 });
 
 // Error Type Doughnut
-var errTypeColors = ["#ce0000","#ffc425","#00502f","#77af96"];
+var errTypeColors = ["#00502f","#ce0000","#ffc425","#f18f1c","#77af96","#666666"];
 new Chart(document.getElementById("errTypeChart"), {
   type: "doughnut",
   data: {
@@ -553,7 +553,7 @@ new Chart(document.getElementById("errTypeChart"), {
 });
 
 // Change 5: Weekly Trends Stacked Bar with Cost Trend Line
-var trendColors = {"A-Accommodation":"#ce0000","D-Delivered Damaged":"#ffc425","L-Lost Part":"#00502f","W-Warranty":"#77af96"};
+var trendColors = {"W-Warranty":"#00502f","A-Accommodation":"#ce0000","D-Delivered Damaged":"#ffc425","P-Picking Error":"#f18f1c","L-Lost Part":"#77af96","V-Vendor Error":"#666666"};
 var trendWeeks = ["Week 8", "Week 9", "Week 10", "Week 11"];
 var trendDatasets = ERR_TRENDS.map(function(t) {
   return {
@@ -776,10 +776,12 @@ function renderErrTable(filteredData) {
   filteredData.forEach(function(d) {
     var tr = document.createElement("tr");
     var codeCls = "";
-    if (d.code.startsWith("W-")) codeCls = "style='color:#77af96;font-weight:600'";
+    if (d.code.startsWith("W-")) codeCls = "style='color:#00502f;font-weight:600'";
     else if (d.code.startsWith("A-")) codeCls = "style='color:#ce0000;font-weight:600'";
     else if (d.code.startsWith("D-")) codeCls = "style='color:#ffc425;font-weight:600'";
-    else if (d.code.startsWith("L-")) codeCls = "style='color:#00502f;font-weight:600'";
+    else if (d.code.startsWith("P-")) codeCls = "style='color:#f18f1c;font-weight:600'";
+    else if (d.code.startsWith("L-")) codeCls = "style='color:#77af96;font-weight:600'";
+    else if (d.code.startsWith("V-")) codeCls = "style='color:#666666;font-weight:600'";
     var notesStr = d.notes || "";
     var notesTrunc = notesStr.length > 30 ? notesStr.substring(0, 30) + "..." : notesStr;
     var notesTitle = notesStr.length > 30 ? ' title="' + notesStr.replace(/"/g, '&quot;') + '"' : '';
