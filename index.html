@@ -4,39 +4,43 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WPP Operations Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;background:#f0f2f5;color:#333}
-.header{background:linear-gradient(135deg,#1B3A4B 0%,#2d6a4f 100%);color:white;padding:24px 40px}
-.header h1{font-size:28px;font-weight:700}
-.header p{font-size:14px;opacity:0.85;margin-top:4px}
+body{font-family:'Roboto Condensed',Arial,Helvetica,sans-serif;background:#f0f2f5;color:#333}
+h1,h2,h3,.section-title,.kpi-card .value,.tab-btn,.print-btn{font-family:'Oswald',Arial,sans-serif}
+.header{background:linear-gradient(135deg,#00502f 0%,#77af96 100%);color:white;padding:24px 40px}
+.header h1{font-size:28px;font-weight:600;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:1px}
+.header p{font-size:14px;opacity:0.85;margin-top:4px;font-family:'Roboto Condensed',sans-serif}
 .container{max-width:1400px;margin:0 auto;padding:24px}
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
 .kpi-card{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-align:center}
-.kpi-card .value{font-size:32px;font-weight:700;color:#1B3A4B}
+.kpi-card .value{font-size:32px;font-weight:700;color:#00502f}
 .kpi-card .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
 .kpi-card .sub{font-size:11px;color:#aaa;margin-top:2px}
-.kpi-card.green .value{color:#2d6a4f}
-.kpi-card.red .value{color:#c0392b}
+.kpi-card.green .value{color:#00502f}
+.kpi-card.red .value{color:#ce0000}
 .kpi-card.blue .value{color:#2980b9}
-.kpi-card.orange .value{color:#e67e22}
+.kpi-card.orange .value{color:#f18f1c}
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
 .chart-card{background:white;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
-.chart-card h3{font-size:16px;color:#1B3A4B;margin-bottom:16px;border-bottom:2px solid #e0e0e0;padding-bottom:8px}
+.chart-card h3{font-size:16px;color:#00502f;margin-bottom:16px;border-bottom:2px solid #ccdcd5;padding-bottom:8px;font-family:'Oswald',sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
 .chart-card canvas{max-height:300px}
 .full-width{grid-column:1/-1}
 table{width:100%;border-collapse:collapse;font-size:12px}
-th{background:#1B3A4B;color:white;padding:10px 8px;text-align:left;position:sticky;top:0;cursor:pointer}
-th:hover{background:#2d6a4f}
+th{background:#00502f;color:white;padding:10px 8px;text-align:left;position:sticky;top:0;cursor:pointer;font-family:'Oswald',sans-serif;font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:0.5px}
+th:hover{background:#77af96}
 td{padding:8px;border-bottom:1px solid #e8e8e8}
 tr:hover td{background:#f5f9fc}
 tr.late td{background:#fff3f3}
-tr.late{border-left:4px solid #c0392b}
-tr.late td:nth-child(7){color:#c0392b;font-weight:700}
-tr.delivered td:nth-child(2){color:#2d6a4f;font-weight:600}
-tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
+tr.late{border-left:4px solid #ce0000}
+tr.late td:nth-child(7){color:#ce0000;font-weight:700}
+tr.delivered td:nth-child(2){color:#00502f;font-weight:600}
+tr.intransit td:nth-child(2){color:#f18f1c;font-weight:600}
 .table-wrap{max-height:500px;overflow-y:auto;border-radius:8px}
 .status-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
 .status-delivered{background:#d4edda;color:#155724}
@@ -45,15 +49,15 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 .filter-bar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .filter-bar select,.filter-bar input{padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px}
 .filter-bar label{font-size:12px;color:#666;font-weight:600}
-.section-title{font-size:20px;color:#1B3A4B;margin:24px 0 16px;font-weight:700}
-.print-btn{background:#1B3A4B;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px}
-.print-btn:hover{background:#2d6a4f}
+.section-title{font-size:20px;color:#00502f;margin:24px 0 16px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.print-btn{background:#00502f;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-family:'Oswald',sans-serif;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+.print-btn:hover{background:#77af96}
 
 /* TAB NAVIGATION */
-.tab-nav{display:flex;gap:0;margin:0;padding:0 40px;background:linear-gradient(135deg,#142e3b 0%,#245540 100%)}
-.tab-btn{padding:14px 32px;border:none;background:transparent;color:rgba(255,255,255,0.6);font-size:15px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s}
+.tab-nav{display:flex;gap:0;margin:0;padding:0 40px;background:linear-gradient(135deg,#003d24 0%,#00502f 100%)}
+.tab-btn{padding:14px 32px;border:none;background:transparent;color:rgba(255,255,255,0.6);font-size:15px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s;font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:1px}
 .tab-btn:hover{color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.05)}
-.tab-btn.active{color:white;border-bottom:3px solid #e9c46a;background:rgba(255,255,255,0.08)}
+.tab-btn.active{color:white;border-bottom:3px solid #ffc425;background:rgba(255,255,255,0.08)}
 .tab-content{display:none}
 .tab-content.active{display:block}
 
@@ -61,9 +65,9 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 .risk-high{background:#f8d7da;color:#721c24;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
 .risk-medium{background:#fff3cd;color:#856404;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
 .risk-low{background:#d4edda;color:#155724;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
-.priority-high{color:#c0392b;font-weight:700}
-.priority-medium{color:#e67e22;font-weight:700}
-.priority-low{color:#27ae60;font-weight:700}
+.priority-high{color:#ce0000;font-weight:700}
+.priority-medium{color:#f18f1c;font-weight:700}
+.priority-low{color:#00502f;font-weight:700}
 .status-in-progress{background:#cce5ff;color:#004085;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
 .status-planned{background:#fff3cd;color:#856404;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
 .capa-table td,.capa-table th{font-size:12px;padding:8px 10px}
@@ -71,17 +75,17 @@ tr.intransit td:nth-child(2){color:#e67e22;font-weight:600}
 .err-table td,.err-table th{padding:6px 8px}
 
 /* Change 6: RCA/CAPA cross-reference styles */
-.highlight-row td{background:#e8f4fd !important;transition:background 0.3s}
+.highlight-row td{background:#dce8e3 !important;transition:background 0.3s}
 .dim-row{opacity:0.3;transition:opacity 0.3s}
 tr.clickable-row{cursor:pointer}
-tr.clickable-row:hover td{background:#f0f7ff}
+tr.clickable-row:hover td{background:#dce8e3}
 
 @media print{.header{break-after:avoid}.no-print{display:none}.chart-card{break-inside:avoid}.tab-nav{display:none}}
 @media(max-width:768px){.charts-row{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#e8f5e9;color:#2d6a4f;font-size:12px;border-bottom:1px solid #c8e6c9">Dashboard last rebuilt: March 13, 2026 at 05:14 PM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 13, 2026 at 05:14 PM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -251,7 +255,7 @@ var statusCounts = {};
 DATA.forEach(function(d) { statusCounts[d.statusShort] = (statusCounts[d.statusShort] || 0) + 1; });
 new Chart(document.getElementById("statusChart"), {
   type: "doughnut",
-  data: { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: ["#2d6a4f","#e9c46a","#e76f51"], borderWidth: 2 }] },
+  data: { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: ["#00502f","#ffc425","#f18f1c"], borderWidth: 2 }] },
   options: { responsive: true, plugins: { legend: { position: "bottom" } } }
 });
 
@@ -277,8 +281,8 @@ new Chart(document.getElementById("weeklyChart"), {
   data: {
     labels: weekLabels,
     datasets: [
-      { label: "Shipments", data: weekKeys.map(function(k) { return weeks[k].count; }), backgroundColor: "#1B3A4B", yAxisID: "y" },
-      { label: "Total Cost ($)", data: weekKeys.map(function(k) { return weeks[k].cost.toFixed(2); }), type: "line", borderColor: "#e9c46a", backgroundColor: "#e9c46a", yAxisID: "y1", tension: 0.3, pointRadius: 5 }
+      { label: "Shipments", data: weekKeys.map(function(k) { return weeks[k].count; }), backgroundColor: "#00502f", yAxisID: "y" },
+      { label: "Total Cost ($)", data: weekKeys.map(function(k) { return weeks[k].cost.toFixed(2); }), type: "line", borderColor: "#ffc425", backgroundColor: "#ffc425", yAxisID: "y1", tension: 0.3, pointRadius: 5 }
     ]
   },
   options: {
@@ -299,7 +303,7 @@ new Chart(document.getElementById("costChart"), {
   type: "pie",
   data: {
     labels: ["Base Freight ($" + baseFreight.toFixed(0) + ")", "Fuel Surcharge ($" + totalFuel.toFixed(0) + ")", "Accessorial ($" + totalAccessorial.toFixed(0) + ")"],
-    datasets: [{ data: [baseFreight, totalFuel, totalAccessorial], backgroundColor: ["#1B3A4B","#e9c46a","#e76f51"] }]
+    datasets: [{ data: [baseFreight, totalFuel, totalAccessorial], backgroundColor: ["#00502f","#ffc425","#f18f1c"] }]
   },
   options: { responsive: true, plugins: { legend: { position: "bottom" } } }
 });
@@ -317,7 +321,7 @@ new Chart(document.getElementById("transitChart"), {
   type: "bar",
   data: {
     labels: Object.keys(transitBuckets).map(function(k) { return k + " days"; }),
-    datasets: [{ label: "Shipments", data: Object.values(transitBuckets), backgroundColor: ["#264653","#2a9d8f","#2d6a4f","#e9c46a","#e76f51"] }]
+    datasets: [{ label: "Shipments", data: Object.values(transitBuckets), backgroundColor: ["#00502f","#77af96","#ffc425","#ffd576","#f18f1c"] }]
   },
   options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
 });
@@ -347,11 +351,11 @@ DATA.forEach(function(d) { if (d.state) stateCounts[d.state] = (stateCounts[d.st
   if (maxCount === 0) maxCount = 1;
 
   function interpolateColor(count) {
-    if (count === 0) return "#e8e8e8";
+    if (count === 0) return "#dce8e3";
     var t = count / maxCount;
-    var r = Math.round(232 + (45 - 232) * t);
-    var g = Math.round(232 + (106 - 232) * t);
-    var b = Math.round(232 + (79 - 232) * t);
+    var r = Math.round(220 + (0 - 220) * t);
+    var g = Math.round(232 + (80 - 232) * t);
+    var b = Math.round(227 + (47 - 227) * t);
     return "rgb(" + r + "," + g + "," + b + ")";
   }
 
@@ -386,7 +390,7 @@ DATA.forEach(function(d) { if (d.state) stateCounts[d.state] = (stateCounts[d.st
   var legendY = (maxRow + 1) * (tileH + gap) + 10;
   svgParts.push('<defs><linearGradient id="lgGrad" x1="0%" y1="0%" x2="100%" y2="0%">');
   svgParts.push('<stop offset="0%" stop-color="#e8e8e8"/>');
-  svgParts.push('<stop offset="100%" stop-color="#2d6a4f"/>');
+  svgParts.push('<stop offset="100%" stop-color="#00502f"/>');
   svgParts.push('</linearGradient></defs>');
   svgParts.push('<rect x="100" y="' + legendY + '" width="200" height="12" fill="url(#lgGrad)" rx="3"/>');
   svgParts.push('<text x="95" y="' + (legendY + 10) + '" text-anchor="end" fill="#666" font-size="10">0</text>');
@@ -425,7 +429,7 @@ DATA.forEach(function(d) { if (d.state) stateCounts[d.state] = (stateCounts[d.st
 var costTimeData = DATA.filter(function(d) { return d.pickup; }).map(function(d) { return { x: d.pickup, y: d.charges, pro: d.pro }; });
 new Chart(document.getElementById("costTimeChart"), {
   type: "scatter",
-  data: { datasets: [{ label: "Cost per Shipment", data: costTimeData, backgroundColor: "#1B3A4B", pointRadius: 6, pointHoverRadius: 9 }] },
+  data: { datasets: [{ label: "Cost per Shipment", data: costTimeData, backgroundColor: "#00502f", pointRadius: 6, pointHoverRadius: 9 }] },
   options: {
     responsive: true,
     scales: {
@@ -537,7 +541,7 @@ errKpis.forEach(function(k) {
 });
 
 // Error Type Doughnut
-var errTypeColors = ["#e76f51","#e9c46a","#264653","#2a9d8f"];
+var errTypeColors = ["#ce0000","#ffc425","#00502f","#77af96"];
 new Chart(document.getElementById("errTypeChart"), {
   type: "doughnut",
   data: {
@@ -548,7 +552,7 @@ new Chart(document.getElementById("errTypeChart"), {
 });
 
 // Change 5: Weekly Trends Stacked Bar with Cost Trend Line
-var trendColors = {"A-Accommodation":"#e76f51","D-Delivered Damaged":"#e9c46a","L-Lost Part":"#264653","W-Warranty":"#2a9d8f"};
+var trendColors = {"A-Accommodation":"#ce0000","D-Delivered Damaged":"#ffc425","L-Lost Part":"#00502f","W-Warranty":"#77af96"};
 var trendWeeks = ["Week 8", "Week 9", "Week 10", "Week 11"];
 var trendDatasets = ERR_TRENDS.map(function(t) {
   return {
@@ -585,8 +589,8 @@ trendDatasets.push({
   label: "Total Cost ($)",
   data: weeklyCosts,
   type: "line",
-  borderColor: "#c0392b",
-  backgroundColor: "#c0392b",
+  borderColor: "#ce0000",
+  backgroundColor: "#ce0000",
   yAxisID: "y1",
   tension: 0.3,
   pointRadius: 5,
@@ -623,7 +627,7 @@ new Chart(document.getElementById("errTop10Chart"), {
   type: "bar",
   data: {
     labels: ERR_TOP10.map(function(d) { return d.product.length > 40 ? d.product.substring(0,40) + "..." : d.product; }),
-    datasets: [{ label: "Cost ($)", data: ERR_TOP10.map(function(d) { return d.cost; }), backgroundColor: ERR_TOP10.map(function(d) { return trendColors[d.code] || "#1B3A4B"; }) }]
+    datasets: [{ label: "Cost ($)", data: ERR_TOP10.map(function(d) { return d.cost; }), backgroundColor: ERR_TOP10.map(function(d) { return trendColors[d.code] || "#00502f"; }) }]
   },
   options: {
     indexAxis: "y",
@@ -708,7 +712,7 @@ function renderWatchTable() {
     var tr = document.createElement("tr");
     var alertCls = d.alert === "HIGH" ? "risk-high" : (d.alert === "MEDIUM" ? "risk-medium" : "risk-low");
     var trendIcon = d.trend === "DOWN" ? "&#9660; " : (d.trend === "UP" ? "&#9650; " : "&#9654; ");
-    var trendColor = d.trend === "DOWN" ? "color:#2d6a4f" : (d.trend === "UP" ? "color:#c0392b" : "");
+    var trendColor = d.trend === "DOWN" ? "color:#00502f" : (d.trend === "UP" ? "color:#ce0000" : "");
     tr.innerHTML = "<td>" + d.product + "</td><td>" + d.code + "</td><td>" + d.current + "</td><td>" + d.historical + "</td><td><span style='" + trendColor + "'>" + trendIcon + d.trend + "</span></td><td><span class='" + alertCls + "'>" + d.alert + "</span></td>";
     watchBody.appendChild(tr);
   });
@@ -771,10 +775,10 @@ function renderErrTable(filteredData) {
   filteredData.forEach(function(d) {
     var tr = document.createElement("tr");
     var codeCls = "";
-    if (d.code.startsWith("W-")) codeCls = "style='color:#2a9d8f;font-weight:600'";
-    else if (d.code.startsWith("A-")) codeCls = "style='color:#e76f51;font-weight:600'";
-    else if (d.code.startsWith("D-")) codeCls = "style='color:#e9c46a;font-weight:600'";
-    else if (d.code.startsWith("L-")) codeCls = "style='color:#264653;font-weight:600'";
+    if (d.code.startsWith("W-")) codeCls = "style='color:#77af96;font-weight:600'";
+    else if (d.code.startsWith("A-")) codeCls = "style='color:#ce0000;font-weight:600'";
+    else if (d.code.startsWith("D-")) codeCls = "style='color:#ffc425;font-weight:600'";
+    else if (d.code.startsWith("L-")) codeCls = "style='color:#00502f;font-weight:600'";
     var notesStr = d.notes || "";
     var notesTrunc = notesStr.length > 30 ? notesStr.substring(0, 30) + "..." : notesStr;
     var notesTitle = notesStr.length > 30 ? ' title="' + notesStr.replace(/"/g, '&quot;') + '"' : '';
