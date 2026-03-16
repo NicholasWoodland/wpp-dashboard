@@ -26,10 +26,6 @@ h1,h2,h3,.section-title,.kpi-card .value,.tab-btn,.print-btn{font-family:'Oswald
 .kpi-card.red .value{color:#ce0000}
 .kpi-card.blue .value{color:#2980b9}
 .kpi-card.orange .value{color:#f18f1c}
-.kpi-delta{font-size:11px;margin-top:4px;font-weight:600;font-family:'Roboto Condensed',sans-serif}
-.kpi-delta.good{color:#00502f}
-.kpi-delta.bad{color:#ce0000}
-.kpi-delta.neutral{color:#888}
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
 .chart-card{background:white;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .chart-card h3{font-size:16px;color:#00502f;margin-bottom:16px;border-bottom:2px solid #ccdcd5;padding-bottom:8px;font-family:'Oswald',sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
@@ -94,7 +90,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 16, 2026 at 01:15 PM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 16, 2026 at 01:36 PM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -248,19 +244,6 @@ function parseErrDateToISO(dateStr) {
   return parts[2] + "-" + parts[0].padStart(2, "0") + "-" + parts[1].padStart(2, "0");
 }
 
-// ── Utility: compute period-over-period delta HTML ──
-function deltaHtml(current, prior, goodDir) {
-  // goodDir: "up" means increase is good, "down" means decrease is good, "neutral" means no color
-  if (prior === 0 || prior === null || prior === undefined) return '<div class="kpi-delta neutral">N/A vs prior week</div>';
-  var pctChange = ((current - prior) / Math.abs(prior)) * 100;
-  var arrow = pctChange >= 0 ? "\u25B2" : "\u25BC";
-  var absPct = Math.abs(pctChange).toFixed(1);
-  var cls = "neutral";
-  if (goodDir === "up") cls = pctChange >= 0 ? "good" : "bad";
-  else if (goodDir === "down") cls = pctChange <= 0 ? "good" : "bad";
-  return '<div class="kpi-delta ' + cls + '">' + arrow + ' ' + absPct + '% vs prior week</div>';
-}
-
 // ══════════════════════════════════════
 // DATA
 // ══════════════════════════════════════
@@ -303,55 +286,6 @@ var errAvgCostChartInst = null;
 // TAB 1: LTL SHIPPING
 // ══════════════════════════════════════
 
-function computeLTLWeeklyBuckets(data) {
-  var weeks = {};
-  data.forEach(function(d) {
-    if (!d.pickup) return;
-    var key = getWeekStart(d.pickup);
-    if (!weeks[key]) weeks[key] = { count: 0, cost: 0, delivered: [], all: [] };
-    weeks[key].count++;
-    weeks[key].cost += d.charges;
-    weeks[key].all.push(d);
-    if (d.status === "Delivered") weeks[key].delivered.push(d);
-  });
-  return weeks;
-}
-
-function computeLTLDeltas(data) {
-  var weeks = computeLTLWeeklyBuckets(data);
-  var weekKeys = Object.keys(weeks).sort();
-  if (weekKeys.length < 2) return {};
-
-  var recentKey = weekKeys[weekKeys.length - 1];
-  var priorKey = weekKeys[weekKeys.length - 2];
-  var recent = weeks[recentKey];
-  var prior = weeks[priorKey];
-
-  // Total shipments
-  var shipDelta = { current: recent.count, prior: prior.count };
-
-  // On-time rate
-  var recentOnTime = recent.delivered.filter(function(d) { return d.daysLate !== null && d.daysLate <= 0; }).length;
-  var recentOTR = recent.delivered.length > 0 ? (recentOnTime / recent.delivered.length * 100) : 0;
-  var priorOnTime = prior.delivered.filter(function(d) { return d.daysLate !== null && d.daysLate <= 0; }).length;
-  var priorOTR = prior.delivered.length > 0 ? (priorOnTime / prior.delivered.length * 100) : 0;
-  var otrDelta = { current: recentOTR, prior: priorOTR };
-
-  // Avg cost
-  var recentAvgCost = recent.count > 0 ? (recent.cost / recent.count) : 0;
-  var priorAvgCost = prior.count > 0 ? (prior.cost / prior.count) : 0;
-  var costDelta = { current: recentAvgCost, prior: priorAvgCost };
-
-  // Avg transit
-  var recentTransit = recent.delivered.reduce(function(s, d) { return s + (d.transitDays || 0); }, 0);
-  var recentAvgTransit = recent.delivered.length > 0 ? (recentTransit / recent.delivered.length) : 0;
-  var priorTransit = prior.delivered.reduce(function(s, d) { return s + (d.transitDays || 0); }, 0);
-  var priorAvgTransit = prior.delivered.length > 0 ? (priorTransit / prior.delivered.length) : 0;
-  var transitDelta = { current: recentAvgTransit, prior: priorAvgTransit };
-
-  return { shipments: shipDelta, onTimeRate: otrDelta, avgCost: costDelta, avgTransit: transitDelta };
-}
-
 function refreshLTLDashboard() {
   var data = filteredLTL;
   var delivered = data.filter(function(d) { return d.status === "Delivered"; });
@@ -361,17 +295,15 @@ function refreshLTLDashboard() {
   var avgTransit = delivered.length > 0 ? delivered.reduce(function(s, d) { return s + (d.transitDays || 0); }, 0) / delivered.length : 0;
   var totalWeight = data.reduce(function(s, d) { return s + d.weight; }, 0);
 
-  var deltas = computeLTLDeltas(data);
-
   var kpis = [
-    { value: data.length, label: "Total Shipments", sub: "", cls: "", delta: deltas.shipments ? deltaHtml(deltas.shipments.current, deltas.shipments.prior, "neutral") : "" },
-    { value: delivered.length, label: "Delivered", sub: data.length > 0 ? (delivered.length / data.length * 100).toFixed(1) + "% of total" : "", cls: "green", delta: "" },
-    { value: (data.length - delivered.length), label: "In Transit", sub: "Pending delivery", cls: "blue", delta: "" },
-    { value: delivered.length > 0 ? (onTime.length / delivered.length * 100).toFixed(1) + "%" : "N/A", label: "On-Time Rate", sub: onTime.length + " of " + delivered.length + " on time", cls: "green", delta: deltas.onTimeRate ? deltaHtml(deltas.onTimeRate.current, deltas.onTimeRate.prior, "up") : "" },
-    { value: "$" + totalCharges.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}), label: "Total Freight Spend", sub: "", cls: "", delta: "" },
-    { value: "$" + avgCost.toFixed(2), label: "Avg Cost/Shipment", sub: "", cls: "", delta: deltas.avgCost ? deltaHtml(deltas.avgCost.current, deltas.avgCost.prior, "down") : "" },
-    { value: avgTransit.toFixed(1) + " days", label: "Avg Transit Time", sub: "", cls: "", delta: deltas.avgTransit ? deltaHtml(deltas.avgTransit.current, deltas.avgTransit.prior, "down") : "" },
-    { value: totalWeight.toLocaleString() + " lbs", label: "Total Weight Shipped", sub: data.length > 0 ? "Avg: " + Math.round(totalWeight/data.length) + " lbs/shipment" : "", cls: "", delta: "" }
+    { value: data.length, label: "Total Shipments", sub: "", cls: "" },
+    { value: delivered.length, label: "Delivered", sub: data.length > 0 ? (delivered.length / data.length * 100).toFixed(1) + "% of total" : "", cls: "green" },
+    { value: (data.length - delivered.length), label: "In Transit", sub: "Pending delivery", cls: "blue" },
+    { value: delivered.length > 0 ? (onTime.length / delivered.length * 100).toFixed(1) + "%" : "N/A", label: "On-Time Rate", sub: onTime.length + " of " + delivered.length + " on time", cls: "green" },
+    { value: "$" + totalCharges.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}), label: "Total Freight Spend", sub: "", cls: "" },
+    { value: "$" + avgCost.toFixed(2), label: "Avg Cost/Shipment", sub: "", cls: "" },
+    { value: avgTransit.toFixed(1) + " days", label: "Avg Transit Time", sub: "", cls: "" },
+    { value: totalWeight.toLocaleString() + " lbs", label: "Total Weight Shipped", sub: data.length > 0 ? "Avg: " + Math.round(totalWeight/data.length) + " lbs/shipment" : "", cls: "" }
   ];
 
   var kpiRow = document.getElementById("kpiRow");
@@ -379,7 +311,7 @@ function refreshLTLDashboard() {
   kpis.forEach(function(k) {
     var div = document.createElement("div");
     div.className = "kpi-card " + k.cls;
-    div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>' + k.delta;
+    div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>';
     kpiRow.appendChild(div);
   });
 
@@ -682,36 +614,6 @@ var errTypeColors = ["#00502f","#ce0000","#ffc425","#f18f1c","#77af96","#666666"
 var trendColors = {"W-Warranty":"#00502f","A-Accommodation":"#ce0000","D-Delivered Damaged":"#ffc425","P-Picking Error":"#f18f1c","L-Lost Part":"#77af96","V-Vendor Error":"#666666"};
 var trendWeeks = ["Week 8", "Week 9", "Week 10", "Week 11"];
 
-function computeErrDeltas(data) {
-  // Group by ISO week
-  var weekBuckets = {};
-  data.forEach(function(d) {
-    if (d.date) {
-      try {
-        var dt = new Date(d.date);
-        var wn = getWeekNumber(dt);
-        var key = "Week " + wn;
-        if (!weekBuckets[key]) weekBuckets[key] = { count: 0, cost: 0 };
-        weekBuckets[key].count++;
-        weekBuckets[key].cost += d.cost;
-      } catch(e) {}
-    }
-  });
-
-  var bucketKeys = Object.keys(weekBuckets).sort(function(a, b) {
-    return parseInt(a.replace(/\D/g, "")) - parseInt(b.replace(/\D/g, ""));
-  });
-
-  if (bucketKeys.length < 2) return {};
-  var recent = weekBuckets[bucketKeys[bucketKeys.length - 1]];
-  var prior = weekBuckets[bucketKeys[bucketKeys.length - 2]];
-
-  return {
-    totalErrors: { current: recent.count, prior: prior.count },
-    totalCost: { current: recent.cost, prior: prior.cost }
-  };
-}
-
 function computeErrWeeklyData(data) {
   // Recompute weekly error data from raw records (instead of using pre-aggregated ERR_TRENDS)
   var weekBuckets = {};
@@ -781,17 +683,15 @@ function refreshErrDashboard() {
   var capaInProg = ERR_CAPA.filter(function(d) { return d.status === "In Progress"; }).length;
   var capaPlanned = ERR_CAPA.filter(function(d) { return d.status === "Planned"; }).length;
 
-  var deltas = computeErrDeltas(data);
-
   var errKpis = [
-    { value: totalErrors, label: "Total Errors", sub: "", cls: "red", delta: deltas.totalErrors ? deltaHtml(deltas.totalErrors.current, deltas.totalErrors.prior, "down") : "" },
-    { value: "$" + totalErrCost.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2}), label: "Total Error Cost", sub: "Avg: $" + avgErrCost.toFixed(2), cls: "red", delta: deltas.totalCost ? deltaHtml(deltas.totalCost.current, deltas.totalCost.prior, "down") : "" },
-    { value: topType.code, label: "Top Error Type", sub: topType.count + " occurrences (" + topType.pct.toFixed(0) + "%)", cls: "orange", delta: "" },
-    { value: openErrors, label: "Open Errors", sub: closedErrors + " closed", cls: "blue", delta: "" },
-    { value: filteredBytype.length, label: "Reason Codes", sub: "", cls: "", delta: "" },
-    { value: ERR_RCA.length, label: "Root Causes Identified", sub: ERR_RCA.filter(function(d){return d.risk==="HIGH"}).length + " HIGH risk", cls: "red", delta: "" },
-    { value: ERR_CAPA.length, label: "CAPA Actions", sub: capaInProg + " in progress, " + capaPlanned + " planned", cls: "green", delta: "" },
-    { value: ERR_WATCH.length, label: "Products on Watch", sub: "Repeat offenders", cls: "orange", delta: "" }
+    { value: totalErrors, label: "Total Errors", sub: "", cls: "red" },
+    { value: "$" + totalErrCost.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2}), label: "Total Error Cost", sub: "Avg: $" + avgErrCost.toFixed(2), cls: "red" },
+    { value: topType.code, label: "Top Error Type", sub: topType.count + " occurrences (" + topType.pct.toFixed(0) + "%)", cls: "orange" },
+    { value: openErrors, label: "Open Errors", sub: closedErrors + " closed", cls: "blue" },
+    { value: filteredBytype.length, label: "Reason Codes", sub: "", cls: "" },
+    { value: ERR_RCA.length, label: "Root Causes Identified", sub: ERR_RCA.filter(function(d){return d.risk==="HIGH"}).length + " HIGH risk", cls: "red" },
+    { value: ERR_CAPA.length, label: "CAPA Actions", sub: capaInProg + " in progress, " + capaPlanned + " planned", cls: "green" },
+    { value: ERR_WATCH.length, label: "Products on Watch", sub: "Repeat offenders", cls: "orange" }
   ];
 
   var errKpiRow = document.getElementById("errKpiRow");
@@ -799,7 +699,7 @@ function refreshErrDashboard() {
   errKpis.forEach(function(k) {
     var div = document.createElement("div");
     div.className = "kpi-card " + k.cls;
-    div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>' + k.delta;
+    div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>';
     errKpiRow.appendChild(div);
   });
 
