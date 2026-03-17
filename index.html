@@ -90,7 +90,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 17, 2026 at 01:08 PM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 17, 2026 at 01:31 PM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -157,19 +157,6 @@ tr.clickable-row:hover td{background:#dce8e3}
 <div class="chart-card"><h3>Total Errors by Week</h3><canvas id="errTotalByWeekChart"></canvas></div>
 <div class="chart-card"><h3>Average Cost per Error by Week</h3><canvas id="errAvgCostChart"></canvas></div>
 </div>
-
-<!-- Picking & Manufacturing Focus -->
-<div class="section-title">Picking &amp; Manufacturing Focus</div>
-<div class="kpi-row" id="pmKpiRow"></div>
-<div class="charts-row">
-<div class="chart-card"><h3>Picking &amp; Manufacturing Errors by Week</h3><canvas id="pmWeeklyChart"></canvas></div>
-<div class="chart-card"><h3>Picking &amp; Manufacturing — Affected Products</h3><canvas id="pmProductChart"></canvas></div>
-</div>
-<div class="chart-card full-width" style="padding:0;"><div class="table-wrap">
-<table class="capa-table" id="pmTable"><thead><tr>
-<th onclick="sortPMTable(0)">Sales Order</th><th onclick="sortPMTable(1)">Status</th><th onclick="sortPMTable(2)">Product</th><th onclick="sortPMTable(3)">Ship From</th><th onclick="sortPMTable(4)">Cost</th><th onclick="sortPMTable(5)">Reason Code</th><th onclick="sortPMTable(6)">Date</th><th onclick="sortPMTable(7)">Notes</th>
-</tr></thead><tbody id="pmBody"></tbody></table>
-</div></div>
 
 <!-- Root Cause Analysis -->
 <div class="section-title">Root Cause Analysis (RCA)</div>
@@ -296,8 +283,6 @@ var errCostChartInst = null;
 var errTop10ChartInst = null;
 var errTotalByWeekChartInst = null;
 var errAvgCostChartInst = null;
-var pmWeeklyChartInst = null;
-var pmProductChartInst = null;
 
 // ══════════════════════════════════════
 // TAB 1: LTL SHIPPING
@@ -919,142 +904,8 @@ function refreshErrDashboard() {
     }
   });
 
-  // ── Picking & Manufacturing Focus Section ──
-  var PM_CODES = ["P-Picking Error", "M-Manufacturing"];
-  var pmData = filteredErrRaw.filter(function(d) {
-    return PM_CODES.some(function(c) { return d.code === c; });
-  });
-
-  var pmTotal = pmData.length;
-  var pmCost = pmData.reduce(function(s, d) { return s + d.cost; }, 0);
-  var pmAvg = pmTotal > 0 ? pmCost / pmTotal : 0;
-  var pmPicking = pmData.filter(function(d) { return d.code === "P-Picking Error"; }).length;
-  var pmMfg = pmData.filter(function(d) { return d.code === "M-Manufacturing"; }).length;
-  var pmPctOfTotal = filteredErrRaw.length > 0 ? (pmTotal / filteredErrRaw.length * 100) : 0;
-
-  // Unique products affected
-  var pmProducts = {};
-  pmData.forEach(function(d) { if (d.product) pmProducts[d.product] = (pmProducts[d.product] || 0) + 1; });
-  var pmProductCount = Object.keys(pmProducts).length;
-
-  var pmKpiRow = document.getElementById("pmKpiRow");
-  pmKpiRow.innerHTML = "";
-  var pmKpis = [
-    { value: pmTotal, label: "Picking & Mfg Errors", sub: pmPctOfTotal.toFixed(1) + "% of all errors", cls: "orange" },
-    { value: pmPicking, label: "Picking Errors", sub: "", cls: "orange" },
-    { value: pmMfg, label: "Manufacturing Errors", sub: "", cls: "red" },
-    { value: "$" + pmCost.toFixed(2), label: "Total Cost", sub: "Avg: $" + pmAvg.toFixed(2), cls: "red" },
-    { value: pmProductCount, label: "Products Affected", sub: "", cls: "" }
-  ];
-  pmKpis.forEach(function(k) {
-    var div = document.createElement("div");
-    div.className = "kpi-card" + (k.cls ? " " + k.cls : "");
-    div.innerHTML = '<div class="value">' + k.value + '</div><div class="label">' + k.label + '</div><div class="sub">' + k.sub + '</div>';
-    pmKpiRow.appendChild(div);
-  });
-
-  // Weekly P&M chart
-  var pmWeeklyAgg = {};
-  pmData.forEach(function(d) {
-    if (d.date) {
-      try {
-        var dt = new Date(parseErrDateToISO(d.date));
-        var wn = getWeekNumber(dt);
-        var key = "Week " + wn;
-        if (!pmWeeklyAgg[key]) pmWeeklyAgg[key] = { picking: 0, mfg: 0, cost: 0 };
-        if (d.code === "P-Picking Error") pmWeeklyAgg[key].picking++;
-        else pmWeeklyAgg[key].mfg++;
-        pmWeeklyAgg[key].cost += d.cost;
-      } catch(e) {}
-    }
-  });
-  var pmWeekKeys = Object.keys(pmWeeklyAgg).sort(function(a, b) {
-    return parseInt(a.replace(/\D/g, "")) - parseInt(b.replace(/\D/g, ""));
-  });
-
-  if (pmWeeklyChartInst) pmWeeklyChartInst.destroy();
-  pmWeeklyChartInst = new Chart(document.getElementById("pmWeeklyChart"), {
-    type: "bar",
-    data: {
-      labels: pmWeekKeys,
-      datasets: [
-        { label: "Picking Errors", data: pmWeekKeys.map(function(w) { return pmWeeklyAgg[w].picking; }), backgroundColor: "#f18f1c", borderRadius: 4 },
-        { label: "Manufacturing Errors", data: pmWeekKeys.map(function(w) { return pmWeeklyAgg[w].mfg; }), backgroundColor: "#ce0000", borderRadius: 4 }
-      ]
-    },
-    options: {
-      responsive: true,
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 }, title: { display: true, text: "Error Count" } } },
-      plugins: { legend: { display: true, position: "bottom" }, tooltip: {
-        callbacks: { afterBody: function(ctx) { var w = pmWeekKeys[ctx[0].dataIndex]; return "Total cost: $" + pmWeeklyAgg[w].cost.toFixed(2); } }
-      } }
-    }
-  });
-
-  // Product breakdown horizontal bar
-  var pmProdSorted = Object.entries(pmProducts).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 10);
-  var pmProdLabels = pmProdSorted.map(function(p) { return p[0].length > 40 ? p[0].substring(0, 37) + "..." : p[0]; });
-  var pmProdValues = pmProdSorted.map(function(p) { return p[1]; });
-
-  if (pmProductChartInst) pmProductChartInst.destroy();
-  pmProductChartInst = new Chart(document.getElementById("pmProductChart"), {
-    type: "bar",
-    data: {
-      labels: pmProdLabels,
-      datasets: [{ label: "Error Count", data: pmProdValues, backgroundColor: "#f18f1c", borderRadius: 4 }]
-    },
-    options: {
-      indexAxis: "y",
-      responsive: true,
-      scales: { x: { beginAtZero: true, ticks: { stepSize: 1 }, title: { display: true, text: "Count" } } },
-      plugins: { legend: { display: false } }
-    }
-  });
-
-  // P&M Detail Table
-  var pmBody = document.getElementById("pmBody");
-  pmBody.innerHTML = "";
-  pmData.forEach(function(d) {
-    var tr = document.createElement("tr");
-    var codeCls = d.code.startsWith("P-") ? "style='color:#f18f1c;font-weight:600'" : "style='color:#ce0000;font-weight:600'";
-    var notesStr = d.notes || "";
-    var notesTrunc = notesStr.length > 30 ? notesStr.substring(0, 30) + "..." : notesStr;
-    var notesTitle = notesStr.length > 30 ? ' title="' + notesStr.replace(/"/g, '&quot;') + '"' : '';
-    tr.innerHTML = "<td>" + d.so + "</td><td>" + d.status + "</td><td>" + d.product + "</td><td>" + d.ship + "</td><td>$" + d.cost.toFixed(2) + "</td><td " + codeCls + ">" + d.code + "</td><td>" + d.date + "</td><td" + notesTitle + ">" + notesTrunc + "</td>";
-    pmBody.appendChild(tr);
-  });
-
   // ── Re-apply error table filters ──
   applyErrFilters();
-}
-
-// ── P&M table sorting ──
-var pmSortCol = -1, pmSortAsc = true;
-function sortPMTable(col) {
-  if (pmSortCol === col) pmSortAsc = !pmSortAsc;
-  else { pmSortCol = col; pmSortAsc = true; }
-  var keys = ["so","status","product","ship","cost","code","date","notes"];
-  var PM_CODES = ["P-Picking Error", "M-Manufacturing"];
-  var pmRows = filteredErrRaw.filter(function(d) { return PM_CODES.some(function(c) { return d.code === c; }); });
-  pmRows.sort(function(a, b) {
-    var va = a[keys[col]], vb = b[keys[col]];
-    if (va === null || va === undefined) va = "";
-    if (vb === null || vb === undefined) vb = "";
-    if (typeof va === "number") return pmSortAsc ? va - vb : vb - va;
-    return pmSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
-  });
-  var pmBody = document.getElementById("pmBody");
-  pmBody.innerHTML = "";
-  pmRows.forEach(function(d) {
-    var tr = document.createElement("tr");
-    var codeCls = d.code.startsWith("P-") ? "style='color:#f18f1c;font-weight:600'" : "style='color:#ce0000;font-weight:600'";
-    var notesStr = d.notes || "";
-    var notesTrunc = notesStr.length > 30 ? notesStr.substring(0, 30) + "..." : notesStr;
-    var notesTitle = notesStr.length > 30 ? ' title="' + notesStr.replace(/"/g, '&quot;') + '"' : '';
-    tr.innerHTML = "<td>" + d.so + "</td><td>" + d.status + "</td><td>" + d.product + "</td><td>" + d.ship + "</td><td>$" + d.cost.toFixed(2) + "</td><td " + codeCls + ">" + d.code + "</td><td>" + d.date + "</td><td" + notesTitle + ">" + notesTrunc + "</td>";
-    pmBody.appendChild(tr);
-  });
-  updateSortArrows("pmTable", col, pmSortAsc);
 }
 
 // ── RCA/CAPA cross-reference highlight functions ──
