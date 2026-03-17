@@ -90,7 +90,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 17, 2026 at 09:32 AM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: March 17, 2026 at 09:44 AM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -154,6 +154,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 <div class="chart-card"><h3>Weekly Error Trends</h3><canvas id="errTrendChart"></canvas></div>
 <div class="chart-card"><h3>Error Cost by Type</h3><canvas id="errCostChart"></canvas></div>
 <div class="chart-card"><h3>Top 10 Errors by Cost</h3><canvas id="errTop10Chart"></canvas></div>
+<div class="chart-card"><h3>Total Errors by Week</h3><canvas id="errTotalByWeekChart"></canvas></div>
 <div class="chart-card"><h3>Average Cost per Error by Week</h3><canvas id="errAvgCostChart"></canvas></div>
 </div>
 
@@ -280,6 +281,7 @@ var errTypeChartInst = null;
 var errTrendChartInst = null;
 var errCostChartInst = null;
 var errTop10ChartInst = null;
+var errTotalByWeekChartInst = null;
 var errAvgCostChartInst = null;
 
 // ══════════════════════════════════════
@@ -809,6 +811,49 @@ function refreshErrDashboard() {
           weeklyErrAgg[weekLabel].count++;
         }
       } catch(e) {}
+    }
+  });
+
+  // ── Total Errors by Week ──
+  var totalErrByWeekData = weeklyData.weekLabels.map(function(w) {
+    return weeklyErrAgg[w].count;
+  });
+
+  if (errTotalByWeekChartInst) errTotalByWeekChartInst.destroy();
+  errTotalByWeekChartInst = new Chart(document.getElementById("errTotalByWeekChart"), {
+    type: "bar",
+    data: {
+      labels: weeklyData.weekLabels,
+      datasets: [{
+        label: "Total Errors",
+        data: totalErrByWeekData,
+        backgroundColor: "#00502f",
+        borderColor: "#003d24",
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "Error Count" },
+          ticks: { stepSize: 1 }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var w = weeklyData.weekLabels[ctx.dataIndex];
+              var agg = weeklyErrAgg[w];
+              return ctx.raw + " errors ($" + agg.cost.toFixed(0) + " total cost)";
+            }
+          }
+        }
+      }
     }
   });
 
