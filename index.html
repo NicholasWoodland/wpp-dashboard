@@ -95,7 +95,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: April 16, 2026 at 10:34 AM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: April 16, 2026 at 10:51 AM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -213,6 +213,12 @@ function switchTab(tabId) {
   var btns = document.querySelectorAll(".tab-btn");
   if (tabId === "ltl") btns[0].classList.add("active");
   else btns[1].classList.add("active");
+  // Resize all Chart.js instances so they fill their containers after tab becomes visible
+  setTimeout(function() {
+    Object.keys(Chart.instances).forEach(function(key) {
+      Chart.instances[key].resize();
+    });
+  }, 50);
 }
 
 // ── Sort Direction Indicators ──
