@@ -75,6 +75,11 @@ tr.intransit td:nth-child(2){color:#f18f1c;font-weight:600}
 .priority-low{color:#00502f;font-weight:700}
 .status-in-progress{background:#cce5ff;color:#004085;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
 .status-planned{background:#fff3cd;color:#856404;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.status-complete{background:#d4edda;color:#155724;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.capa-status-select{padding:3px 6px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid #ccc;cursor:pointer;appearance:auto}
+.capa-status-select.planned{background:#fff3cd;color:#856404}
+.capa-status-select.in-progress{background:#cce5ff;color:#004085}
+.capa-status-select.complete{background:#d4edda;color:#155724}
 .capa-table td,.capa-table th{font-size:12px;padding:8px 10px}
 .err-table{font-size:11px}
 .err-table td,.err-table th{padding:6px 8px}
@@ -90,7 +95,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: April 16, 2026 at 09:42 AM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: April 16, 2026 at 10:11 AM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -958,19 +963,66 @@ function renderRCATable() {
 }
 renderRCATable();
 
-// ── CAPA Table ──
+// ── CAPA Table with editable status ──
+function getCapaStatuses() {
+  try {
+    var saved = localStorage.getItem("wpp_capa_statuses");
+    return saved ? JSON.parse(saved) : {};
+  } catch(e) { return {}; }
+}
+function saveCapaStatus(capaId, status) {
+  var statuses = getCapaStatuses();
+  statuses[capaId] = status;
+  localStorage.setItem("wpp_capa_statuses", JSON.stringify(statuses));
+}
+function getStatusClass(status) {
+  if (status === "In Progress") return "in-progress";
+  if (status === "Complete") return "complete";
+  return "planned";
+}
 function renderCAPATable() {
   var capaBody = document.getElementById("capaBody");
   capaBody.innerHTML = "";
+  var savedStatuses = getCapaStatuses();
+  var capaInProg = 0, capaPlanned = 0, capaComplete = 0;
   ERR_CAPA.forEach(function(d) {
+    var currentStatus = savedStatuses[d.id] || d.status;
+    if (currentStatus === "In Progress") capaInProg++;
+    else if (currentStatus === "Complete") capaComplete++;
+    else capaPlanned++;
     var tr = document.createElement("tr");
     tr.className = "clickable-row";
     tr.setAttribute("data-capa-ref", d.ref);
-    tr.addEventListener("click", function() { highlightRca(d.ref); });
+    tr.addEventListener("click", function(e) { if (e.target.tagName !== "SELECT") highlightRca(d.ref); });
     var prCls = d.priority === "HIGH" ? "priority-high" : (d.priority === "MEDIUM" ? "priority-medium" : "priority-low");
-    var stCls = d.status === "In Progress" ? "status-in-progress" : "status-planned";
-    tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.ref + "</td><td>" + d.action + "</td><td>" + d.owner + "</td><td>" + d.target + "</td><td><span class='" + stCls + "'>" + d.status + "</span></td><td><span class='" + prCls + "'>" + d.priority + "</span></td>";
+    var selectCls = getStatusClass(currentStatus);
+    var selectHtml = '<select class="capa-status-select ' + selectCls + '" data-capa-id="' + d.id + '">' +
+      '<option value="Planned"' + (currentStatus === "Planned" ? ' selected' : '') + '>Planned</option>' +
+      '<option value="In Progress"' + (currentStatus === "In Progress" ? ' selected' : '') + '>In Progress</option>' +
+      '<option value="Complete"' + (currentStatus === "Complete" ? ' selected' : '') + '>Complete</option>' +
+      '</select>';
+    tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.ref + "</td><td>" + d.action + "</td><td>" + d.owner + "</td><td>" + d.target + "</td><td>" + selectHtml + "</td><td><span class='" + prCls + "'>" + d.priority + "</span></td>";
     capaBody.appendChild(tr);
+  });
+  // Update KPI card if it exists
+  var kpiCards = document.querySelectorAll("#errKpiRow .kpi-card");
+  kpiCards.forEach(function(card) {
+    var label = card.querySelector(".label");
+    if (label && label.textContent === "CAPA Actions") {
+      var sub = card.querySelector(".sub");
+      if (sub) sub.textContent = capaComplete + " complete, " + capaInProg + " in progress, " + capaPlanned + " planned";
+    }
+  });
+  // Attach change listeners
+  document.querySelectorAll(".capa-status-select").forEach(function(sel) {
+    sel.addEventListener("change", function(e) {
+      e.stopPropagation();
+      var capaId = this.getAttribute("data-capa-id");
+      var newStatus = this.value;
+      saveCapaStatus(capaId, newStatus);
+      this.className = "capa-status-select " + getStatusClass(newStatus);
+      renderCAPATable();
+    });
   });
 }
 renderCAPATable();
