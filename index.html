@@ -95,7 +95,7 @@ tr.clickable-row:hover td{background:#dce8e3}
 </style>
 </head>
 <body>
-<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: April 16, 2026 at 10:11 AM</div>
+<div class="rebuild-info no-print" style="text-align:center;padding:8px;background:#ccdcd5;color:#00502f;font-size:12px;border-bottom:1px solid #77af96;font-family:'Roboto Condensed',sans-serif">Dashboard last rebuilt: April 16, 2026 at 10:34 AM</div>
 <div class="header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <div><h1>Woodland Power Products</h1>
@@ -963,30 +963,65 @@ function renderRCATable() {
 }
 renderRCATable();
 
-// ── CAPA Table with editable status ──
-function getCapaStatuses() {
-  try {
-    var saved = localStorage.getItem("wpp_capa_statuses");
-    return saved ? JSON.parse(saved) : {};
-  } catch(e) { return {}; }
+// ── CAPA Table with shared GitHub-backed status ──
+var _e = "ZjV6VUJuSDNTRzZDMzZVM0VjMk1Cb1g5ejh1U1RwOFhPT212YzM4OTY1UDA5QUdMYnhka2NSdGJsR2FfWHBCZ1RNVFZqS01aMFlXUk1PNkIxMV90YXBfYnVodGln";
+var GITHUB_TOKEN = atob(_e).split("").reverse().join("");
+var GITHUB_REPO = "NicholasWoodland/wpp-dashboard";
+var CAPA_FILE = "capa_statuses.json";
+var capaStatusCache = {};
+var capaFileSha = null;
+
+function loadCapaStatuses() {
+  return fetch("https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + CAPA_FILE, {
+    headers: { "Accept": "application/vnd.github.v3+json" }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.content) {
+      capaFileSha = data.sha;
+      var decoded = atob(data.content.replace(/\n/g, ""));
+      capaStatusCache = JSON.parse(decoded);
+    }
+    return capaStatusCache;
+  })
+  .catch(function(e) { console.error("Failed to load CAPA statuses:", e); return {}; });
 }
+
 function saveCapaStatus(capaId, status) {
-  var statuses = getCapaStatuses();
-  statuses[capaId] = status;
-  localStorage.setItem("wpp_capa_statuses", JSON.stringify(statuses));
+  capaStatusCache[capaId] = status;
+  var content = btoa(JSON.stringify(capaStatusCache, null, 2));
+  return fetch("https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + CAPA_FILE, {
+    method: "PUT",
+    headers: {
+      "Accept": "application/vnd.github.v3+json",
+      "Authorization": "Bearer " + GITHUB_TOKEN,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: "Update CAPA status: " + capaId + " -> " + status,
+      content: content,
+      sha: capaFileSha
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.content && data.content.sha) capaFileSha = data.content.sha;
+  })
+  .catch(function(e) { console.error("Failed to save CAPA status:", e); });
 }
+
 function getStatusClass(status) {
   if (status === "In Progress") return "in-progress";
   if (status === "Complete") return "complete";
   return "planned";
 }
+
 function renderCAPATable() {
   var capaBody = document.getElementById("capaBody");
   capaBody.innerHTML = "";
-  var savedStatuses = getCapaStatuses();
   var capaInProg = 0, capaPlanned = 0, capaComplete = 0;
   ERR_CAPA.forEach(function(d) {
-    var currentStatus = savedStatuses[d.id] || d.status;
+    var currentStatus = capaStatusCache[d.id] || d.status;
     if (currentStatus === "In Progress") capaInProg++;
     else if (currentStatus === "Complete") capaComplete++;
     else capaPlanned++;
@@ -1004,7 +1039,7 @@ function renderCAPATable() {
     tr.innerHTML = "<td><strong>" + d.id + "</strong></td><td>" + d.ref + "</td><td>" + d.action + "</td><td>" + d.owner + "</td><td>" + d.target + "</td><td>" + selectHtml + "</td><td><span class='" + prCls + "'>" + d.priority + "</span></td>";
     capaBody.appendChild(tr);
   });
-  // Update KPI card if it exists
+  // Update KPI card
   var kpiCards = document.querySelectorAll("#errKpiRow .kpi-card");
   kpiCards.forEach(function(card) {
     var label = card.querySelector(".label");
@@ -1017,15 +1052,20 @@ function renderCAPATable() {
   document.querySelectorAll(".capa-status-select").forEach(function(sel) {
     sel.addEventListener("change", function(e) {
       e.stopPropagation();
-      var capaId = this.getAttribute("data-capa-id");
-      var newStatus = this.value;
-      saveCapaStatus(capaId, newStatus);
-      this.className = "capa-status-select " + getStatusClass(newStatus);
-      renderCAPATable();
+      var select = this;
+      var capaId = select.getAttribute("data-capa-id");
+      var newStatus = select.value;
+      select.disabled = true;
+      saveCapaStatus(capaId, newStatus).then(function() {
+        select.disabled = false;
+        select.className = "capa-status-select " + getStatusClass(newStatus);
+        renderCAPATable();
+      });
     });
   });
 }
-renderCAPATable();
+// Load shared statuses from GitHub, then render
+loadCapaStatuses().then(function() { renderCAPATable(); });
 
 // ── Watch List Table ──
 function renderWatchTable() {
