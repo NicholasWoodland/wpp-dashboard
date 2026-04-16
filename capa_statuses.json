@@ -1,10 +1,26 @@
 {
-  "CAPA-001": "Complete",
-  "CAPA-002": "In Progress",
-  "CAPA-003": "Complete",
-  "CAPA-004": "Complete",
-  "CAPA-005": "Complete",
-  "CAPA-006": "Complete",
-  "CAPA-007": "Complete",
-  "CAPA-008": "Complete"
+  "CAPA-001": {
+    "status": "Complete"
+  },
+  "CAPA-002": {
+    "status": "In Progress"
+  },
+  "CAPA-003": {
+    "status": "Complete"
+  },
+  "CAPA-004": {
+    "status": "Complete"
+  },
+  "CAPA-005": {
+    "status": "Complete"
+  },
+  "CAPA-006": {
+    "status": "Complete"
+  },
+  "CAPA-007": {
+    "status": "Complete"
+  },
+  "CAPA-008": {
+    "status": "Complete"
+  }
 }
