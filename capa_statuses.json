@@ -25,5 +25,8 @@
   },
   "CAPA-009": {
     "owner": "Customer Service"
+  },
+  "CAPA-023": {
+    "status": "Complete"
   }
 }
